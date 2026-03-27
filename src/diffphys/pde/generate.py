@@ -9,7 +9,7 @@ from .boundary import IN_DIST_TYPES, sample_four_edges
 from .laplace import LaplaceSolver
 
 
-def generate_dataset(n, seed, solver, allowed_bc_types=None, nx=64):
+def generate_dataset(n, seed, solver, allowed_bc_types=None):
     """Generate n PDE solution samples with given BC types.
 
     Args:
@@ -17,15 +17,15 @@ def generate_dataset(n, seed, solver, allowed_bc_types=None, nx=64):
         seed: Random seed for reproducibility.
         solver: LaplaceSolver instance (reused for all samples).
         allowed_bc_types: List of BC family names, or None for all in-dist.
-        nx: Grid resolution.
 
     Returns:
         Dict with keys: fields (n, nx, nx), bc_top/bottom/left/right (n, nx).
-        All arrays are float32.
+        All arrays are float32. nx is taken from solver.nx.
     """
     if allowed_bc_types is None:
         allowed_bc_types = IN_DIST_TYPES
 
+    nx = solver.nx
     rng = np.random.default_rng(seed)
 
     fields = np.zeros((n, nx, nx), dtype=np.float32)
@@ -77,7 +77,7 @@ def main():
 
     for name, n, bc_types, seed in splits:
         print(f"Generating {name} ({n} samples)...")
-        data = generate_dataset(n, seed, solver, allowed_bc_types=bc_types, nx=args.nx)
+        data = generate_dataset(n, seed, solver, allowed_bc_types=bc_types)
         path = os.path.join(args.output, f"{name}.npz")
         np.savez_compressed(path, **data)
         print(f"  Saved to {path}")

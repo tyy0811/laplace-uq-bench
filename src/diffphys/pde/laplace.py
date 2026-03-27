@@ -86,10 +86,16 @@ class LaplaceSolver:
     def solve(self, bc_top, bc_bottom, bc_left, bc_right):
         """Solve Laplace equation with given Dirichlet BCs.
 
-        All four boundary arrays must agree at shared corners.
+        All four boundary arrays must have length nx and agree at shared corners.
         Returns (nx, nx) array with boundary values set and interior solved.
         """
         nx, n = self.nx, self.n
+        for name, bc in [("bc_top", bc_top), ("bc_bottom", bc_bottom),
+                         ("bc_left", bc_left), ("bc_right", bc_right)]:
+            if len(bc) != nx:
+                raise ValueError(
+                    f"{name} has length {len(bc)}, expected {nx}"
+                )
         self._check_corner_consistency(bc_top, bc_bottom, bc_left, bc_right)
         rhs = self._assemble_rhs(bc_top, bc_bottom, bc_left, bc_right)
         interior = self._lu.solve(rhs)

@@ -51,6 +51,15 @@ class TestInputValidation:
         with pytest.raises(ValueError, match="Inconsistent top-left corner"):
             solver.solve(bc_top, bc_bottom, bc_left, bc_right)
 
+    def test_bc_length_mismatch_raises(self):
+        solver = LaplaceSolver(nx=8)
+        good = np.zeros(8)
+        bad = np.zeros(7)
+        with pytest.raises(ValueError, match="bc_top has length 7, expected 8"):
+            solver.solve(bad, good, good, good)
+        with pytest.raises(ValueError, match="bc_left has length 10, expected 8"):
+            solver.solve(good, good, np.zeros(10), good)
+
 
 class TestLaplaceSolver:
     @pytest.fixture
