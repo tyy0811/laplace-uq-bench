@@ -113,13 +113,21 @@ class TestSampleFourEdges:
 
     def test_default_excludes_piecewise(self):
         """Default allowed_types should be IN_DIST_TYPES (no piecewise)."""
-        # sample_four_edges with no allowed_types should never pick piecewise.
-        # We can't observe the type directly, but we can verify the default
-        # matches IN_DIST_TYPES by checking the module-level constant.
-        from diffphys.pde import boundary
-        import inspect
-        src = inspect.getsource(boundary.sample_four_edges)
-        assert "IN_DIST_TYPES" in src
+        from unittest.mock import patch
+        captured_types = []
+        original_fn = sample_edge_profile.__wrapped__ if hasattr(sample_edge_profile, '__wrapped__') else sample_edge_profile
+
+        def tracking_profile(rng, c_start, c_end, bc_type=None, nx=64):
+            captured_types.append(bc_type)
+            return original_fn(rng, c_start, c_end, bc_type, nx)
+
+        with patch("diffphys.pde.boundary.sample_edge_profile", tracking_profile):
+            for seed in range(20):
+                sample_four_edges(np.random.default_rng(seed), nx=16)
+
+        assert all(t in IN_DIST_TYPES for t in captured_types), (
+            f"Non-in-dist type used by default: {set(captured_types) - set(IN_DIST_TYPES)}"
+        )
 
     def test_determinism(self):
         e1 = sample_four_edges(np.random.default_rng(42), nx=64)
