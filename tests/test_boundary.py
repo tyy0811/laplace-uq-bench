@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 from diffphys.pde.boundary import (
     BC_TYPES,
+    IN_DIST_TYPES,
     sample_corners,
     sample_edge_profile,
     sample_four_edges,
@@ -109,6 +110,16 @@ class TestSampleFourEdges:
         x = np.linspace(0, 1, 64)
         expected = bc_top[0] + (bc_top[-1] - bc_top[0]) * x
         np.testing.assert_allclose(bc_top, expected, atol=1e-12)
+
+    def test_default_excludes_piecewise(self):
+        """Default allowed_types should be IN_DIST_TYPES (no piecewise)."""
+        # sample_four_edges with no allowed_types should never pick piecewise.
+        # We can't observe the type directly, but we can verify the default
+        # matches IN_DIST_TYPES by checking the module-level constant.
+        from diffphys.pde import boundary
+        import inspect
+        src = inspect.getsource(boundary.sample_four_edges)
+        assert "IN_DIST_TYPES" in src
 
     def test_determinism(self):
         e1 = sample_four_edges(np.random.default_rng(42), nx=64)

@@ -96,7 +96,7 @@ def sample_four_edges(rng, allowed_types=None, nx=64):
     - bc_bottom[-1] == bc_right[-1] (bottom-right)
     """
     if allowed_types is None:
-        allowed_types = BC_TYPES
+        allowed_types = IN_DIST_TYPES
 
     c_tl, c_tr, c_bl, c_br = sample_corners(rng)
 

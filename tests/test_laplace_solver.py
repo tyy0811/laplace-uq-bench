@@ -2,6 +2,7 @@
 
 import numpy as np
 import pytest
+from diffphys.pde.boundary import sample_four_edges
 from diffphys.pde.laplace import build_laplacian_matrix, LaplaceSolver
 
 
@@ -28,6 +29,27 @@ class TestBuildLaplacianMatrix:
         k = n + 1
         row = L.getrow(k).toarray().ravel()
         assert row.sum() == pytest.approx(0.0)
+
+
+class TestInputValidation:
+    @pytest.mark.parametrize("nx", [0, 1, 2, -1])
+    def test_small_nx_raises(self, nx):
+        with pytest.raises(ValueError, match="nx must be >= 3"):
+            LaplaceSolver(nx=nx)
+
+    @pytest.mark.parametrize("nx", [0, 1, 2, -1])
+    def test_build_laplacian_small_nx_raises(self, nx):
+        with pytest.raises(ValueError, match="nx must be >= 3"):
+            build_laplacian_matrix(nx=nx)
+
+    def test_inconsistent_corners_raises(self):
+        solver = LaplaceSolver(nx=8)
+        bc_top = np.array([0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
+        bc_bottom = np.zeros(8)
+        bc_left = np.ones(8)   # bc_left[0]=1.0 != bc_top[0]=0.0
+        bc_right = np.zeros(8)
+        with pytest.raises(ValueError, match="Inconsistent top-left corner"):
+            solver.solve(bc_top, bc_bottom, bc_left, bc_right)
 
 
 class TestLaplaceSolver:
@@ -78,7 +100,7 @@ class TestLaplaceSolver:
     def test_maximum_principle(self, solver):
         """Interior values bounded by boundary extremes."""
         rng = np.random.default_rng(42)
-        bcs = [rng.uniform(-1, 1, 64) for _ in range(4)]
+        bcs = sample_four_edges(rng, nx=64)
         field = solver.solve(*bcs)
         interior = field[1:-1, 1:-1]
         all_bc = np.concatenate(bcs)
@@ -87,7 +109,7 @@ class TestLaplaceSolver:
 
     def test_finiteness(self, solver):
         rng = np.random.default_rng(42)
-        bcs = [rng.uniform(-1, 1, 64) for _ in range(4)]
+        bcs = sample_four_edges(rng, nx=64)
         field = solver.solve(*bcs)
         assert np.all(np.isfinite(field))
 
@@ -120,7 +142,7 @@ class TestLaplaceSolver:
     def test_residual(self, solver):
         """Numerical Laplacian of solution should be near zero."""
         rng = np.random.default_rng(42)
-        bcs = [rng.uniform(-1, 1, 64) for _ in range(4)]
+        bcs = sample_four_edges(rng, nx=64)
         field = solver.solve(*bcs)
 
         lap = (

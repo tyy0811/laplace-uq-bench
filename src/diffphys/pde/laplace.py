@@ -11,6 +11,8 @@ def build_laplacian_matrix(nx=64):
     5-point stencil. Returns sparse CSC matrix of shape (n^2, n^2)
     where n = nx - 2 (number of interior points per dimension).
     """
+    if nx < 3:
+        raise ValueError(f"nx must be >= 3 (got {nx}): need at least 1 interior point")
     n = nx - 2
     N = n * n
 
@@ -40,6 +42,8 @@ class LaplaceSolver:
     """
 
     def __init__(self, nx=64):
+        if nx < 3:
+            raise ValueError(f"nx must be >= 3 (got {nx}): need at least 1 interior point")
         self.nx = nx
         self.n = nx - 2
         L = build_laplacian_matrix(nx)
@@ -65,12 +69,28 @@ class LaplaceSolver:
 
         return rhs.ravel()
 
+    def _check_corner_consistency(self, bc_top, bc_bottom, bc_left, bc_right):
+        """Raise ValueError if the 4 shared corner values disagree."""
+        corners = [
+            ("top-left", bc_top[0], bc_left[0]),
+            ("top-right", bc_top[-1], bc_right[0]),
+            ("bottom-left", bc_bottom[0], bc_left[-1]),
+            ("bottom-right", bc_bottom[-1], bc_right[-1]),
+        ]
+        for name, a, b in corners:
+            if not np.isclose(a, b):
+                raise ValueError(
+                    f"Inconsistent {name} corner: {a} vs {b}"
+                )
+
     def solve(self, bc_top, bc_bottom, bc_left, bc_right):
         """Solve Laplace equation with given Dirichlet BCs.
 
+        All four boundary arrays must agree at shared corners.
         Returns (nx, nx) array with boundary values set and interior solved.
         """
         nx, n = self.nx, self.n
+        self._check_corner_consistency(bc_top, bc_bottom, bc_left, bc_right)
         rhs = self._assemble_rhs(bc_top, bc_bottom, bc_left, bc_right)
         interior = self._lu.solve(rhs)
 
