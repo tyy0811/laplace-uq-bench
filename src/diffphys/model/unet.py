@@ -108,21 +108,29 @@ class ConditionalUNet(nn.Module):
 
         # Encoder
         self.enc_in = nn.Conv2d(in_ch, chs[0], 3, padding=1)
-        self.down0 = DownBlock(chs[0], chs[0], t_dim)
-        self.down1 = DownBlock(chs[0], chs[1], t_dim)
-        self.down2 = DownBlock(chs[1], chs[2], t_dim)
+        self.downs = nn.ModuleList()
+        # First down block keeps channel count, rest increase
+        enc_chs = [chs[0]] + list(chs)  # e.g. [64, 64, 128, 256]
+        for i in range(len(chs)):
+            self.downs.append(DownBlock(enc_chs[i], enc_chs[i + 1], t_dim))
 
         # Bottleneck
         self.bottleneck = nn.Sequential(
-            ResBlock(chs[2], chs[2], t_dim),
-            ResBlock(chs[2], chs[2], t_dim),
+            ResBlock(chs[-1], chs[-1], t_dim),
+            ResBlock(chs[-1], chs[-1], t_dim),
         )
         self._bottleneck_t_dim = t_dim
 
-        # Decoder
-        self.up2 = UpBlock(chs[2], chs[2], chs[2], t_dim)
-        self.up1 = UpBlock(chs[2], chs[1], chs[1], t_dim)
-        self.up0 = UpBlock(chs[1], chs[0], chs[0], t_dim)
+        # Decoder (mirror of encoder)
+        self.ups = nn.ModuleList()
+        for i in range(len(chs) - 1, -1, -1):
+            if i == len(chs) - 1:
+                in_c = chs[i]
+            else:
+                in_c = chs[i + 1]
+            skip_c = enc_chs[i + 1]
+            out_c = enc_chs[i + 1] if i == len(chs) - 1 else chs[i]
+            self.ups.append(UpBlock(in_c, skip_c, chs[i], t_dim))
 
         # Output
         self.out_conv = nn.Conv2d(chs[0], out_ch, 1)
@@ -139,15 +147,15 @@ class ConditionalUNet(nn.Module):
 
         x = self.enc_in(x)
 
-        skip0, x = self.down0(x, t_emb)
-        skip1, x = self.down1(x, t_emb)
-        skip2, x = self.down2(x, t_emb)
+        skips = []
+        for down in self.downs:
+            skip, x = down(x, t_emb)
+            skips.append(skip)
 
         for block in self.bottleneck:
             x = block(x, t_emb)
 
-        x = self.up2(x, skip2, t_emb)
-        x = self.up1(x, skip1, t_emb)
-        x = self.up0(x, skip0, t_emb)
+        for up, skip in zip(self.ups, reversed(skips)):
+            x = up(x, skip, t_emb)
 
         return self.out_conv(x)
