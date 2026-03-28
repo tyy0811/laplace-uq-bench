@@ -37,8 +37,15 @@ def encode_conditioning(
     cond[2] = bc_left.unsqueeze(1).expand(nx, nx)
     cond[3] = bc_right.unsqueeze(1).expand(nx, nx)
 
-    # Mask channels
-    if mask_top is None:
+    # Mask channels — all four must be provided or all omitted
+    masks = (mask_top, mask_bottom, mask_left, mask_right)
+    n_provided = sum(m is not None for m in masks)
+    if n_provided not in (0, 4):
+        raise ValueError(
+            f"Either all 4 masks or none must be provided, got {n_provided}/4"
+        )
+
+    if n_provided == 0:
         cond[4:8] = 1.0
     else:
         cond[4] = mask_top.unsqueeze(0).expand(nx, nx)

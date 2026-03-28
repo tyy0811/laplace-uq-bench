@@ -68,3 +68,8 @@ class TestEncodeConditioning:
         bcs = tuple(torch.randn(16) for _ in range(4))
         cond = encode_conditioning(*bcs)
         assert cond.shape == (8, 16, 16)
+
+    def test_partial_masks_raises(self, bcs):
+        """Passing only some masks should raise ValueError."""
+        with pytest.raises(ValueError, match="all 4 masks or none"):
+            encode_conditioning(*bcs, mask_top=torch.ones(64))

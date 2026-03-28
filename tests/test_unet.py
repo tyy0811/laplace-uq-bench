@@ -80,3 +80,10 @@ class TestConditionalUNet:
         out1 = model(x)
         out2 = model(x, None)
         torch.testing.assert_close(out1, out2)
+
+    def test_ddpm_requires_t(self):
+        """DDPM U-Net must raise if t is not provided."""
+        model = ConditionalUNet(in_ch=9, out_ch=1, time_emb_dim=256)
+        x = torch.randn(1, 9, 64, 64)
+        with pytest.raises(ValueError, match="t was not passed"):
+            model(x)

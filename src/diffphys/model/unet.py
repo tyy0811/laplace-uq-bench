@@ -129,7 +129,12 @@ class ConditionalUNet(nn.Module):
 
     def forward(self, x, t=None):
         t_emb = None
-        if self.time_emb is not None and t is not None:
+        if self.time_emb is not None:
+            if t is None:
+                raise ValueError(
+                    "ConditionalUNet has time_emb_dim set but t was not passed. "
+                    "DDPM mode requires a timestep tensor."
+                )
             t_emb = self.time_emb(t)
 
         x = self.enc_in(x)
