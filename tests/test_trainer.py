@@ -12,8 +12,13 @@ from diffphys.model.trainer import (
     train_one_epoch,
     validate,
     load_config,
+    train_ddpm_one_epoch,
+    validate_ddpm,
+    train_ddpm,
+    train_ensemble,
 )
 from diffphys.model.unet import ConditionalUNet
+from diffphys.model.ddpm import DDPM
 from diffphys.data.dataset import LaplacePDEDataset
 
 
@@ -84,6 +89,39 @@ class TestValidate:
         loader = torch.utils.data.DataLoader(ds, batch_size=4)
         val_loss = validate(model, loader, "cpu")
         assert np.isfinite(val_loss)
+
+
+class TestTrainDDPM:
+    def test_ddpm_one_epoch_returns_finite_loss(self, config, tiny_npz):
+        config["model"]["in_channels"] = 9
+        config["model"]["time_emb_dim"] = 32
+        model = build_model(config["model"])
+        ddpm = DDPM(model, T=5)
+        optimizer = build_optimizer(ddpm, config["training"])
+        ds = LaplacePDEDataset(config["data"]["train"])
+        loader = torch.utils.data.DataLoader(ds, batch_size=4)
+        avg_loss = train_ddpm_one_epoch(ddpm, loader, optimizer, "cpu")
+        assert np.isfinite(avg_loss)
+        assert avg_loss > 0
+
+    def test_train_ddpm_full_loop(self, config, tiny_npz):
+        config["model"]["in_channels"] = 9
+        config["model"]["time_emb_dim"] = 32
+        config["ddpm"] = {"T": 5, "beta_start": 1e-4, "beta_end": 0.02}
+        config["training"]["epochs"] = 1
+        ddpm, history = train_ddpm(config, device="cpu")
+        assert len(history) == 1
+        assert np.isfinite(history[0]["train_loss"])
+
+
+class TestTrainEnsemble:
+    def test_trains_multiple_members(self, config, tiny_npz):
+        config["ensemble"] = {"n_members": 2, "seeds": [0, 1]}
+        config["training"]["epochs"] = 1
+        train_ensemble(config, device="cpu")
+        # Should create checkpoints for each member
+        assert (Path(config["logging"]["log_dir"]) / "member_0" / "best.pt").exists()
+        assert (Path(config["logging"]["log_dir"]) / "member_1" / "best.pt").exists()
 
 
 class TestLoadConfig:

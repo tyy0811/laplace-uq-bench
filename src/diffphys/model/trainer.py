@@ -96,34 +96,35 @@ def save_checkpoint(model, optimizer, epoch, val_loss, path):
     }, path)
 
 
-def train(config, device="cpu"):
-    """Full training loop from config dict."""
+def _make_loaders(config):
+    """Build train/val DataLoaders from config, respecting regime."""
     from ..data.dataset import LaplacePDEDataset
 
-    log_dir = Path(config["logging"]["log_dir"])
-    log_dir.mkdir(parents=True, exist_ok=True)
-
-    model = build_model(config["model"]).to(device)
-    optimizer = build_optimizer(model, config["training"])
-    scheduler = build_scheduler(optimizer, config["training"])
-
-    train_ds = LaplacePDEDataset(config["data"]["train"])
-    val_ds = LaplacePDEDataset(config["data"]["val"])
+    regime = config.get("training", {}).get("regime", "exact")
+    train_ds = LaplacePDEDataset(config["data"]["train"], regime=regime)
+    val_ds = LaplacePDEDataset(config["data"]["val"], regime=regime)
+    bs = config["training"]["batch_size"]
     train_loader = torch.utils.data.DataLoader(
-        train_ds, batch_size=config["training"]["batch_size"],
-        shuffle=True, num_workers=0,
+        train_ds, batch_size=bs, shuffle=True, num_workers=0,
     )
     val_loader = torch.utils.data.DataLoader(
-        val_ds, batch_size=config["training"]["batch_size"],
-        num_workers=0,
+        val_ds, batch_size=bs, num_workers=0,
     )
+    return train_loader, val_loader
+
+
+def _training_loop(model, train_loader, val_loader, optimizer, scheduler,
+                   config, device, train_fn, val_fn):
+    """Generic epoch loop shared by regressor and DDPM training."""
+    log_dir = Path(config["logging"]["log_dir"])
+    log_dir.mkdir(parents=True, exist_ok=True)
 
     best_val = float("inf")
     history = []
 
     for epoch in range(config["training"]["epochs"]):
-        train_loss = train_one_epoch(model, train_loader, optimizer, device)
-        val_loss = validate(model, val_loader, device)
+        train_loss = train_fn(model, train_loader, optimizer, device)
+        val_loss = val_fn(model, val_loader, device)
         if scheduler:
             scheduler.step()
 
@@ -142,3 +143,83 @@ def train(config, device="cpu"):
         json.dump(history, f, indent=2)
 
     return model, history
+
+
+def train(config, device="cpu"):
+    """Full regressor training loop from config dict."""
+    train_loader, val_loader = _make_loaders(config)
+
+    model = build_model(config["model"]).to(device)
+    optimizer = build_optimizer(model, config["training"])
+    scheduler = build_scheduler(optimizer, config["training"])
+
+    return _training_loop(model, train_loader, val_loader, optimizer, scheduler,
+                          config, device, train_one_epoch, validate)
+
+
+def train_ddpm_one_epoch(ddpm, loader, optimizer, device):
+    """Train DDPM for one epoch. Returns average loss."""
+    ddpm.train()
+    total_loss = 0.0
+    n_batches = 0
+    for cond, target in loader:
+        cond, target = cond.to(device), target.to(device)
+        loss = ddpm.training_step(cond, target)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        total_loss += loss.item()
+        n_batches += 1
+    return total_loss / n_batches
+
+
+def validate_ddpm(ddpm, loader, device):
+    """Compute average DDPM loss on validation set."""
+    ddpm.eval()
+    total_loss = 0.0
+    n_batches = 0
+    with torch.no_grad():
+        for cond, target in loader:
+            cond, target = cond.to(device), target.to(device)
+            loss = ddpm.training_step(cond, target)
+            total_loss += loss.item()
+            n_batches += 1
+    return total_loss / n_batches
+
+
+def train_ddpm(config, device="cpu"):
+    """Full DDPM training loop from config dict."""
+    from .ddpm import DDPM
+
+    train_loader, val_loader = _make_loaders(config)
+
+    model = build_model(config["model"]).to(device)
+    ddpm_cfg = config["ddpm"]
+    ddpm = DDPM(model, T=ddpm_cfg["T"],
+                beta_start=ddpm_cfg["beta_start"],
+                beta_end=ddpm_cfg["beta_end"]).to(device)
+
+    optimizer = build_optimizer(ddpm, config["training"])
+    scheduler = build_scheduler(optimizer, config["training"])
+
+    return _training_loop(ddpm, train_loader, val_loader, optimizer, scheduler,
+                          config, device, train_ddpm_one_epoch, validate_ddpm)
+
+
+def train_ensemble(config, device="cpu"):
+    """Train K independent U-Nets with different seeds."""
+    ens_cfg = config["ensemble"]
+    seeds = ens_cfg["seeds"]
+    base_log_dir = config["logging"]["log_dir"]
+
+    for i, seed in enumerate(seeds):
+        print(f"\n=== Training ensemble member {i+1}/{len(seeds)} (seed={seed}) ===")
+        torch.manual_seed(seed)
+
+        member_config = {**config}
+        member_config["logging"] = {
+            **config["logging"],
+            "log_dir": f"{base_log_dir}/member_{i}",
+        }
+
+        train(member_config, device=device)

@@ -9,7 +9,7 @@ import argparse
 
 import torch
 
-from diffphys.model.trainer import load_config, train
+from diffphys.model.trainer import load_config, train, train_ddpm, train_ensemble
 
 
 def main():
@@ -29,8 +29,15 @@ def main():
     else:
         device = "cpu"
 
-    print(f"Training {config['model']['type']} on {device}")
-    train(config, device=device)
+    if "ensemble" in config:
+        print(f"Training {len(config['ensemble']['seeds'])}-member ensemble on {device}")
+        train_ensemble(config, device=device)
+    elif "ddpm" in config:
+        print(f"Training DDPM on {device}")
+        train_ddpm(config, device=device)
+    else:
+        print(f"Training {config['model']['type']} on {device}")
+        train(config, device=device)
 
 
 if __name__ == "__main__":

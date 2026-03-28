@@ -67,3 +67,19 @@ class TestLaplacePDEDataset:
         cond_batch, target_batch = next(iter(loader))
         assert cond_batch.shape == (4, 8, 16, 16)
         assert target_batch.shape == (4, 1, 16, 16)
+
+    def test_sparse_regime_sets_masks(self, tiny_npz):
+        """very-sparse regime should produce non-all-ones masks."""
+        ds = LaplacePDEDataset(tiny_npz, regime="very-sparse")
+        cond, _ = ds[0]
+        assert cond.shape == (8, 16, 16)
+        # Mask channels should not all be 1.0 (n_points=8 < nx=16)
+        assert not torch.all(cond[4:8] == 1.0)
+
+    def test_mixed_regime_returns_valid_output(self, tiny_npz):
+        """Mixed regime should produce valid 8-channel conditioning."""
+        ds = LaplacePDEDataset(tiny_npz, regime="mixed")
+        cond, target = ds[0]
+        assert cond.shape == (8, 16, 16)
+        assert target.shape == (1, 16, 16)
+        assert torch.isfinite(cond).all()
