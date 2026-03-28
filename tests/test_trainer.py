@@ -123,6 +123,11 @@ class TestTrainEnsemble:
         assert (Path(config["logging"]["log_dir"]) / "member_0" / "best.pt").exists()
         assert (Path(config["logging"]["log_dir"]) / "member_1" / "best.pt").exists()
 
+    def test_n_members_seeds_mismatch_raises(self, config, tiny_npz):
+        config["ensemble"] = {"n_members": 5, "seeds": [0, 1]}
+        with pytest.raises(ValueError, match="n_members=5 but len\\(seeds\\)=2"):
+            train_ensemble(config, device="cpu")
+
 
 class TestLoadConfig:
     def test_loads_yaml(self, tmp_path, config):

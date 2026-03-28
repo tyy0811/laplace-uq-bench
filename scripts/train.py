@@ -30,7 +30,7 @@ def main():
         device = "cpu"
 
     if "ensemble" in config:
-        print(f"Training {len(config['ensemble']['seeds'])}-member ensemble on {device}")
+        print(f"Training {config['ensemble']['n_members']}-member ensemble on {device}")
         train_ensemble(config, device=device)
     elif "ddpm" in config:
         print(f"Training DDPM on {device}")

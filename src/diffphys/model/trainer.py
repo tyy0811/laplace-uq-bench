@@ -97,12 +97,17 @@ def save_checkpoint(model, optimizer, epoch, val_loss, path):
 
 
 def _make_loaders(config):
-    """Build train/val DataLoaders from config, respecting regime."""
+    """Build train/val DataLoaders from config, respecting regime.
+
+    Validation always uses "exact" regime for deterministic loss
+    comparison and stable best-checkpoint selection, even when
+    training uses "mixed" augmentation.
+    """
     from ..data.dataset import LaplacePDEDataset
 
     regime = config.get("training", {}).get("regime", "exact")
     train_ds = LaplacePDEDataset(config["data"]["train"], regime=regime)
-    val_ds = LaplacePDEDataset(config["data"]["val"], regime=regime)
+    val_ds = LaplacePDEDataset(config["data"]["val"], regime="exact")
     bs = config["training"]["batch_size"]
     train_loader = torch.utils.data.DataLoader(
         train_ds, batch_size=bs, shuffle=True, num_workers=0,
@@ -210,10 +215,16 @@ def train_ensemble(config, device="cpu"):
     """Train K independent U-Nets with different seeds."""
     ens_cfg = config["ensemble"]
     seeds = ens_cfg["seeds"]
+    n_members = ens_cfg["n_members"]
+    if len(seeds) != n_members:
+        raise ValueError(
+            f"ensemble.n_members={n_members} but len(seeds)={len(seeds)}; "
+            f"these must match to ensure the correct experiment size"
+        )
     base_log_dir = config["logging"]["log_dir"]
 
     for i, seed in enumerate(seeds):
-        print(f"\n=== Training ensemble member {i+1}/{len(seeds)} (seed={seed}) ===")
+        print(f"\n=== Training ensemble member {i+1}/{n_members} (seed={seed}) ===")
         torch.manual_seed(seed)
 
         member_config = {**config}
