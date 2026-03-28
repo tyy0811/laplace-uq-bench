@@ -29,16 +29,23 @@ def pde_residual_norm(field, h=1.0 / 63):
 
 
 def bc_error(pred, true):
-    """Mean absolute error on boundary pixels."""
-    B = pred.shape[0]
-    errors = []
-    for f_pred, f_true in zip(pred[:, 0], true[:, 0]):
-        top = (f_pred[0, :] - f_true[0, :]).abs().mean()
-        bot = (f_pred[-1, :] - f_true[-1, :]).abs().mean()
-        left = (f_pred[:, 0] - f_true[:, 0]).abs().mean()
-        right = (f_pred[:, -1] - f_true[:, -1]).abs().mean()
-        errors.append((top + bot + left + right) / 4)
-    return torch.stack(errors)
+    """Mean absolute error over unique boundary pixels.
+
+    Collects top row, bottom row, left column (excluding corners),
+    and right column (excluding corners) to avoid double-counting
+    the four corner pixels.
+    """
+    p = pred[:, 0]  # (B, H, W)
+    t = true[:, 0]
+    diff = (p - t).abs()
+
+    top = diff[:, 0, :]           # (B, W)
+    bot = diff[:, -1, :]          # (B, W)
+    left = diff[:, 1:-1, 0]      # (B, H-2)  corners excluded
+    right = diff[:, 1:-1, -1]    # (B, H-2)  corners excluded
+
+    all_bc = torch.cat([top, bot, left, right], dim=1)  # (B, 2W + 2(H-2))
+    return all_bc.mean(dim=1)
 
 
 def max_principle_violations(field):

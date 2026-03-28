@@ -29,10 +29,18 @@ class SpectralConv2d(nn.Module):
         return torch.einsum("bixy,ioxy->boxy", x, weights)
 
     def forward(self, x):
-        B = x.shape[0]
+        B, _, H, W = x.shape
+        rfft_w = W // 2 + 1
+        if self.modes1 > H or self.modes2 > rfft_w:
+            raise ValueError(
+                f"SpectralConv2d modes ({self.modes1}, {self.modes2}) exceed "
+                f"grid FFT dimensions ({H}, {rfft_w}) for input size ({H}, {W}). "
+                f"Reduce modes or increase grid size."
+            )
+
         x_ft = torch.fft.rfft2(x)
 
-        out_ft = torch.zeros(B, self.out_ch, x.size(2), x.size(3) // 2 + 1,
+        out_ft = torch.zeros(B, self.out_ch, H, rfft_w,
                              dtype=torch.cfloat, device=x.device)
 
         out_ft[:, :, :self.modes1, :self.modes2] = \
@@ -40,7 +48,7 @@ class SpectralConv2d(nn.Module):
         out_ft[:, :, -self.modes1:, :self.modes2] = \
             self._compl_mul2d(x_ft[:, :, -self.modes1:, :self.modes2], self.weights2)
 
-        return torch.fft.irfft2(out_ft, s=(x.size(2), x.size(3)))
+        return torch.fft.irfft2(out_ft, s=(H, W))
 
 
 class FNOBlock(nn.Module):

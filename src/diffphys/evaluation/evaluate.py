@@ -62,7 +62,7 @@ def run_evaluation(config_path, checkpoint_path, test_npz_paths, device="cpu"):
     config = load_config(config_path)
     model = build_model(config["model"]).to(device)
 
-    ckpt = torch.load(checkpoint_path, map_location=device, weights_only=True)
+    ckpt = torch.load(checkpoint_path, map_location=device)
     model.load_state_dict(ckpt["model_state_dict"])
 
     all_results = {}

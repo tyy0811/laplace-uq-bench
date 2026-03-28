@@ -77,6 +77,17 @@ class TestBCError:
         err = bc_error(pred, true)
         assert err.item() > 0
 
+    def test_no_corner_double_counting(self):
+        """Each corner pixel should be counted exactly once."""
+        pred = torch.zeros(1, 1, 8, 8)
+        true = torch.zeros(1, 1, 8, 8)
+        # Set only the top-left corner to differ by 1.0
+        true[:, :, 0, 0] = 1.0
+        err = bc_error(pred, true)
+        # 28 unique boundary pixels on an 8x8 grid: 2*8 + 2*(8-2) = 28
+        expected = 1.0 / 28.0
+        assert err.item() == pytest.approx(expected, abs=1e-6)
+
 
 class TestMaxPrincipleViolations:
     def test_harmonic_field_no_violations(self):

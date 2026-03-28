@@ -40,3 +40,10 @@ class TestFNO2d:
             out1 = model(x)
             out2 = model(x)
         torch.testing.assert_close(out1, out2)
+
+    def test_modes_exceeding_grid_raises(self):
+        """Modes larger than FFT dimensions should raise ValueError."""
+        model = FNO2d(in_ch=8, out_ch=1, width=20, modes=12, n_layers=2)
+        x = torch.randn(1, 8, 8, 8)  # rfft_w=5, modes=12 > 5
+        with pytest.raises(ValueError, match="exceed grid FFT dimensions"):
+            model(x)
