@@ -113,6 +113,18 @@ class TestTrainDDPM:
         assert len(history) == 1
         assert np.isfinite(history[0]["train_loss"])
 
+    def test_train_physics_ddpm_full_loop(self, config, tiny_npz):
+        config["model"]["in_channels"] = 9
+        config["model"]["time_emb_dim"] = 32
+        config["ddpm"] = {"T": 5, "beta_start": 1e-4, "beta_end": 0.02}
+        config["physics"] = {"residual_weight": 0.1}
+        config["training"]["epochs"] = 1
+        phys_ddpm, history = train_ddpm(config, device="cpu")
+        assert len(history) == 1
+        assert np.isfinite(history[0]["train_loss"])
+        from diffphys.model.physics_ddpm import PhysicsDDPM
+        assert isinstance(phys_ddpm, PhysicsDDPM)
+
 
 class TestTrainEnsemble:
     def test_trains_multiple_members(self, config, tiny_npz):

@@ -192,23 +192,67 @@ def validate_ddpm(ddpm, loader, device):
     return total_loss / n_batches
 
 
+def train_physics_ddpm_one_epoch(ddpm, loader, optimizer, device):
+    """Train PhysicsDDPM for one epoch. Returns average total loss."""
+    ddpm.train()
+    total_loss = 0.0
+    n_batches = 0
+    for cond, target in loader:
+        cond, target = cond.to(device), target.to(device)
+        losses = ddpm.training_step(cond, target)
+        optimizer.zero_grad()
+        losses["total"].backward()
+        optimizer.step()
+        total_loss += losses["total"].item()
+        n_batches += 1
+    return total_loss / n_batches
+
+
+def validate_physics_ddpm(ddpm, loader, device):
+    """Compute average PhysicsDDPM total loss on validation set."""
+    ddpm.eval()
+    total_loss = 0.0
+    n_batches = 0
+    with torch.no_grad():
+        for cond, target in loader:
+            cond, target = cond.to(device), target.to(device)
+            losses = ddpm.training_step(cond, target)
+            total_loss += losses["total"].item()
+            n_batches += 1
+    return total_loss / n_batches
+
+
 def train_ddpm(config, device="cpu"):
-    """Full DDPM training loop from config dict."""
+    """Full DDPM or PhysicsDDPM training loop from config dict."""
     from .ddpm import DDPM
 
     train_loader, val_loader = _make_loaders(config)
 
     model = build_model(config["model"]).to(device)
     ddpm_cfg = config["ddpm"]
-    ddpm = DDPM(model, T=ddpm_cfg["T"],
-                beta_start=ddpm_cfg["beta_start"],
-                beta_end=ddpm_cfg["beta_end"]).to(device)
+
+    if "physics" in config:
+        from .physics_ddpm import PhysicsDDPM
+        ddpm = PhysicsDDPM(
+            model, T=ddpm_cfg["T"],
+            residual_weight=config["physics"]["residual_weight"],
+            beta_start=ddpm_cfg["beta_start"],
+            beta_end=ddpm_cfg["beta_end"],
+        ).to(device)
+        train_fn = train_physics_ddpm_one_epoch
+        val_fn = validate_physics_ddpm
+    else:
+        ddpm = DDPM(model, T=ddpm_cfg["T"],
+                    beta_start=ddpm_cfg["beta_start"],
+                    beta_end=ddpm_cfg["beta_end"]).to(device)
+        train_fn = train_ddpm_one_epoch
+        val_fn = validate_ddpm
 
     optimizer = build_optimizer(ddpm, config["training"])
     scheduler = build_scheduler(optimizer, config["training"])
 
     return _training_loop(ddpm, train_loader, val_loader, optimizer, scheduler,
-                          config, device, train_ddpm_one_epoch, validate_ddpm)
+                          config, device, train_fn, val_fn)
 
 
 def train_ensemble(config, device="cpu"):

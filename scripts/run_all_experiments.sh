@@ -18,23 +18,23 @@ python scripts/evaluate.py --config configs/fno.yaml \
     --checkpoint experiments/fno/best.pt \
     --output experiments/fno/results.json --device cuda
 
-echo "=== Phase 2: Probabilistic Models ==="
+echo "=== Phase 2: Probabilistic Models (mixed-regime training) ==="
 
-echo "Training ensemble (5 members)..."
-python scripts/train.py --config configs/ensemble.yaml --device cuda
+echo "Training ensemble (5 members, mixed regime)..."
+python scripts/train.py --config configs/ensemble_phase2.yaml --device cuda
 
-echo "Training DDPM..."
-python scripts/train.py --config configs/ddpm.yaml --device cuda
+echo "Training DDPM (mixed regime)..."
+python scripts/train.py --config configs/ddpm_phase2.yaml --device cuda
 
 echo "Phase 2 UQ evaluation..."
 python scripts/evaluate_phase2.py --model-type ensemble \
-    --config configs/ensemble.yaml \
-    --checkpoints experiments/ensemble/member_*/best.pt \
-    --output experiments/ensemble/uq_results.json --device cuda
+    --config configs/ensemble_phase2.yaml \
+    --checkpoints experiments/ensemble_phase2/member_*/best.pt \
+    --output experiments/ensemble_phase2/uq_results.json --device cuda
 
 python scripts/evaluate_phase2.py --model-type ddpm \
-    --config configs/ddpm.yaml \
-    --checkpoints experiments/ddpm/best.pt \
-    --output experiments/ddpm/uq_results.json --device cuda
+    --config configs/ddpm_phase2.yaml \
+    --checkpoints experiments/ddpm_phase2/best.pt \
+    --output experiments/ddpm_phase2/uq_results.json --device cuda
 
 echo "=== Done ==="

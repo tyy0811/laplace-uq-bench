@@ -3,6 +3,7 @@
 Usage:
     modal run modal/train_remote.py --config configs/unet_regressor.yaml
     modal run modal/train_remote.py --config configs/ddpm.yaml
+    modal run modal/train_remote.py --config configs/ensemble_phase2.yaml
 """
 
 import modal
@@ -16,8 +17,20 @@ image = (
     .pip_install_from_requirements("modal/requirements.txt")
     .copy_local_dir("src", "/root/src")
     .copy_local_dir("configs", "/root/configs")
+    .copy_local_file("pyproject.toml", "/root/pyproject.toml")
     .run_commands("cd /root && pip install -e .")
 )
+
+
+def _rewrite_paths(config):
+    """Rewrite data/ and experiments/ paths to Modal volume mount."""
+    for key in ("train", "val"):
+        if key in config.get("data", {}):
+            config["data"][key] = config["data"][key].replace("data/", "/data/")
+    config["logging"]["log_dir"] = config["logging"]["log_dir"].replace(
+        "experiments/", "/data/experiments/"
+    )
+    return config
 
 
 @app.function(
@@ -30,18 +43,7 @@ def train_model(config_path: str):
     import torch
     from diffphys.model.trainer import load_config, train, train_ddpm
 
-    config = load_config(config_path)
-
-    # Point data paths to the volume mount
-    for key in ("train", "val"):
-        if key in config.get("data", {}):
-            original = config["data"][key]
-            config["data"][key] = original.replace("data/", "/data/")
-
-    config["logging"]["log_dir"] = config["logging"]["log_dir"].replace(
-        "experiments/", "/data/experiments/"
-    )
-
+    config = _rewrite_paths(load_config(config_path))
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     if "ddpm" in config:
@@ -58,30 +60,14 @@ def train_model(config_path: str):
     timeout=3600 * 6,
     volumes={"/data": volume},
 )
-def train_ensemble(config_path: str):
+def train_ensemble_remote(config_path: str):
     import torch
-    from diffphys.model.trainer import load_config, train
+    from diffphys.model.trainer import load_config, train_ensemble
 
-    config = load_config(config_path)
+    config = _rewrite_paths(load_config(config_path))
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    for key in ("train", "val"):
-        config["data"][key] = config["data"][key].replace("data/", "/data/")
-
-    seeds = config["ensemble"]["seeds"]
-    for i, seed in enumerate(seeds):
-        print(f"\n=== Training ensemble member {i+1}/{len(seeds)} (seed={seed}) ===")
-        torch.manual_seed(seed)
-
-        member_config = {**config}
-        member_config["logging"] = {
-            **config["logging"],
-            "log_dir": config["logging"]["log_dir"].replace(
-                "experiments/", "/data/experiments/"
-            ) + f"/member_{i}",
-        }
-
-        train(member_config, device=device)
+    train_ensemble(config, device=device)
 
     volume.commit()
 
@@ -93,6 +79,6 @@ def main(config: str):
         cfg = yaml.safe_load(f)
 
     if "ensemble" in cfg:
-        train_ensemble.remote(config)
+        train_ensemble_remote.remote(config)
     else:
         train_model.remote(config)
