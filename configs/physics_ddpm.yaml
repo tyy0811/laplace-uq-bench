@@ -1,0 +1,30 @@
+model:
+  type: unet
+  in_channels: 9
+  out_channels: 1
+  base_channels: 64
+  channel_mult: [1, 2, 4]
+  time_emb_dim: 256
+
+ddpm:
+  T: 200
+  beta_start: 1.0e-4
+  beta_end: 0.02
+
+physics:
+  residual_weight: 0.1
+
+training:
+  batch_size: 64
+  lr: 2.0e-4
+  epochs: 100
+  weight_decay: 0.0
+  scheduler: cosine
+
+data:
+  train: data/train.npz
+  val: data/val.npz
+
+logging:
+  log_dir: experiments/physics_ddpm
+  save_every: 20
