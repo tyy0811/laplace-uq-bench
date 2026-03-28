@@ -1,0 +1,21 @@
+model:
+  type: unet
+  in_channels: 8
+  out_channels: 1
+  base_channels: 64
+  channel_mult: [1, 2, 4]
+
+training:
+  batch_size: 64
+  lr: 1.0e-3
+  epochs: 50
+  weight_decay: 1.0e-4
+  scheduler: cosine
+
+data:
+  train: data/train.npz
+  val: data/val.npz
+
+logging:
+  log_dir: experiments/unet_regressor
+  save_every: 10
