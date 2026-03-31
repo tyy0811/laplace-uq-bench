@@ -99,6 +99,53 @@ class TestPixelwiseConformalPredictor:
         assert cp_pixel.q_hat < cp_spatial.q_hat
 
 
+class TestConformalEvaluation:
+    def test_evaluate_conformal_for_model_keys(self):
+        """Should return spatial and pixelwise results at each target."""
+        from diffphys.evaluation.evaluate_uq import evaluate_conformal_for_model
+
+        rng = np.random.default_rng(42)
+        N = 100
+        cal_mean = rng.standard_normal((N, 8, 8))
+        cal_std = np.abs(rng.standard_normal((N, 8, 8))) + 0.1
+        cal_truth = cal_mean + 0.5 * rng.standard_normal((N, 8, 8))
+        test_mean = rng.standard_normal((N, 8, 8))
+        test_std = np.abs(rng.standard_normal((N, 8, 8))) + 0.1
+        test_truth = test_mean + 0.5 * rng.standard_normal((N, 8, 8))
+
+        results = evaluate_conformal_for_model(
+            cal_mean, cal_std, cal_truth,
+            test_mean, test_std, test_truth,
+            targets=[0.50, 0.90, 0.95],
+        )
+        assert "raw_coverage_90" in results
+        assert "spatial_90_coverage" in results
+        assert "spatial_90_q_hat" in results
+        assert "spatial_90_mean_width" in results
+        assert "pixelwise_90_coverage" in results
+        assert "pixelwise_90_q_hat" in results
+
+    def test_conformal_improves_coverage(self):
+        """Conformal should achieve >= target coverage on well-behaved data."""
+        from diffphys.evaluation.evaluate_uq import evaluate_conformal_for_model
+
+        rng = np.random.default_rng(123)
+        N = 500
+        cal_mean = rng.standard_normal((N, 8, 8))
+        cal_std = np.ones((N, 8, 8))
+        cal_truth = cal_mean + rng.standard_normal((N, 8, 8))
+        test_mean = rng.standard_normal((N, 8, 8))
+        test_std = np.ones((N, 8, 8))
+        test_truth = test_mean + rng.standard_normal((N, 8, 8))
+
+        results = evaluate_conformal_for_model(
+            cal_mean, cal_std, cal_truth,
+            test_mean, test_std, test_truth,
+            targets=[0.90],
+        )
+        assert results["pixelwise_90_coverage"] >= 0.88
+
+
 class TestCollectPredictions:
     def test_collect_ensemble_predictions_shapes(self):
         """Helper should return (N, H, W) numpy arrays."""

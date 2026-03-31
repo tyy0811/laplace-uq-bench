@@ -118,6 +118,62 @@ def collect_generative_predictions(model, loader, device, n_samples=20):
     return np.concatenate(all_mean), np.concatenate(all_std), np.concatenate(all_true)
 
 
+# Normal quantile lookup (avoids scipy dependency on Modal)
+_NORM_Z = {0.50: 0.6745, 0.90: 1.6449, 0.95: 1.9600}
+
+
+def evaluate_conformal_for_model(
+    cal_mean, cal_std, cal_truth,
+    test_mean, test_std, test_truth,
+    targets=(0.50, 0.90, 0.95),
+):
+    """Run conformal prediction evaluation on precomputed predictions.
+
+    Args:
+        cal_mean, cal_std, cal_truth: (N_cal, H, W) calibration arrays.
+        test_mean, test_std, test_truth: (N_test, H, W) test arrays.
+        targets: Coverage target levels.
+
+    Returns:
+        Dict with raw and conformal metrics at each target.
+    """
+    from .conformal import SpatialConformalPredictor, PixelwiseConformalPredictor
+
+    results = {}
+
+    for target in targets:
+        pct = int(target * 100)
+        alpha = 1.0 - target
+
+        # Raw coverage (no conformal) on test set using Gaussian quantiles
+        z = _NORM_Z.get(target, 1.6449)
+        raw_lower = test_mean - z * np.maximum(test_std, 1e-8)
+        raw_upper = test_mean + z * np.maximum(test_std, 1e-8)
+        raw_covered = (test_truth >= raw_lower) & (test_truth <= raw_upper)
+        results[f"raw_coverage_{pct}"] = float(raw_covered.mean())
+
+        # Spatial conformal
+        cp_s = SpatialConformalPredictor(alpha=alpha)
+        cp_s.calibrate(cal_mean, cal_std, cal_truth)
+        s_lower, s_upper = cp_s.predict_intervals(test_mean, test_std)
+        s_covered = (test_truth >= s_lower) & (test_truth <= s_upper)
+        results[f"spatial_{pct}_coverage"] = float(s_covered.all(axis=(1, 2)).mean())
+        results[f"spatial_{pct}_pixelwise_coverage"] = float(s_covered.mean())
+        results[f"spatial_{pct}_q_hat"] = float(cp_s.q_hat)
+        results[f"spatial_{pct}_mean_width"] = float((s_upper - s_lower).mean())
+
+        # Pixelwise conformal
+        cp_p = PixelwiseConformalPredictor(alpha=alpha)
+        cp_p.calibrate(cal_mean, cal_std, cal_truth)
+        p_lower, p_upper = cp_p.predict_intervals(test_mean, test_std)
+        p_covered = (test_truth >= p_lower) & (test_truth <= p_upper)
+        results[f"pixelwise_{pct}_coverage"] = float(p_covered.mean())
+        results[f"pixelwise_{pct}_q_hat"] = float(cp_p.q_hat)
+        results[f"pixelwise_{pct}_mean_width"] = float((p_upper - p_lower).mean())
+
+    return results
+
+
 def _compute_uq_summary(true, mean, std):
     return {
         "coverage_50": pixelwise_coverage(true, mean, std, 0.50).item(),
