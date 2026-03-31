@@ -51,6 +51,19 @@ class TestSpatialConformalPredictor:
         assert np.all(np.isfinite(upper))
 
 
+    def test_quantile_is_exact_order_statistic(self):
+        """q_hat must be an actual calibration score, not interpolated."""
+        cp = SpatialConformalPredictor(alpha=0.4)
+        # 5 samples, 1x1 spatial so sample_scores = raw scores
+        preds = np.zeros((5, 1, 1))
+        sigma = np.ones((5, 1, 1))
+        # Ground truth chosen so |truth - pred|/sigma = [0, 1, 4, 8, 100]
+        truth = np.array([0, 1, 4, 8, 100]).reshape(5, 1, 1).astype(float)
+        q = cp.calibrate(preds, sigma, truth)
+        # k = ceil(6 * 0.6) = 4 → 4th order statistic = sorted_scores[3] = 8
+        assert q == 8.0, f"Expected exact order statistic 8, got {q}"
+
+
 class TestPixelwiseConformalPredictor:
     def test_coverage_guarantee_empirical(self):
         np.random.seed(42)
@@ -84,3 +97,31 @@ class TestPixelwiseConformalPredictor:
         cp_pixel.calibrate(preds, sigma, truth)
 
         assert cp_pixel.q_hat < cp_spatial.q_hat
+
+
+class TestCollectPredictions:
+    def test_collect_ensemble_predictions_shapes(self):
+        """Helper should return (N, H, W) numpy arrays."""
+        from diffphys.evaluation.evaluate_uq import collect_ensemble_predictions
+        import torch
+
+        class FakeModel(torch.nn.Module):
+            def __init__(self, val):
+                super().__init__()
+                self.val = val
+            def forward(self, x):
+                return torch.full((x.shape[0], 1, 8, 8), self.val)
+
+        from diffphys.model.ensemble import EnsemblePredictor
+        ensemble = EnsemblePredictor([FakeModel(1.0), FakeModel(3.0)])
+
+        conds = torch.randn(10, 8, 8, 8)
+        targets = torch.randn(10, 1, 8, 8)
+        ds = torch.utils.data.TensorDataset(conds, targets)
+        loader = torch.utils.data.DataLoader(ds, batch_size=4)
+
+        mean, std, truth = collect_ensemble_predictions(ensemble, loader, "cpu")
+        assert mean.shape == (10, 8, 8)
+        assert std.shape == (10, 8, 8)
+        assert truth.shape == (10, 8, 8)
+        assert np.allclose(mean, 2.0, atol=1e-5)
