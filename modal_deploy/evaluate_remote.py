@@ -142,6 +142,7 @@ def evaluate_ddpm_uq(max_samples: int = 300):
     ddpm = _build_ddpm(model, config["ddpm"]).to("cuda")
     ckpt = torch.load("/data/experiments/ddpm_improved/best.pt", map_location="cuda")
     ddpm.load_state_dict(ckpt["model_state_dict"])
+    ddpm.eval()
 
     for regime in REGIMES:
         if regime in results:
@@ -224,6 +225,7 @@ def evaluate_fm_uq(max_samples: int = 300):
     ).to("cuda")
     ckpt = torch.load("/data/experiments/flow_matching/best.pt", map_location="cuda")
     cfm.load_state_dict(ckpt["model_state_dict"])
+    cfm.eval()
 
     for regime in REGIMES:
         if regime in results:
@@ -306,6 +308,8 @@ def evaluate_conformal(max_samples: int = 300):
         results = {}
         total_time = 0.0
 
+    if max_samples < 4:
+        raise ValueError(f"max_samples must be >= 4 for meaningful cal/test split, got {max_samples}")
     n_cal = max_samples // 2
     n_test = max_samples - n_cal
 
@@ -341,6 +345,7 @@ def evaluate_conformal(max_samples: int = 300):
             "/data/experiments/flow_matching/best.pt", map_location="cuda"
         )
         cfm.load_state_dict(ckpt["model_state_dict"])
+        cfm.eval()
         model_configs.append(("flow_matching", cfm, "generative"))
 
     # 3. Improved DDPM (slow - 200 steps x 20 samples)
@@ -352,6 +357,7 @@ def evaluate_conformal(max_samples: int = 300):
             "/data/experiments/ddpm_improved/best.pt", map_location="cuda"
         )
         ddpm.load_state_dict(ckpt["model_state_dict"])
+        ddpm.eval()
         model_configs.append(("ddpm_improved", ddpm, "generative"))
 
     for model_name, model, model_type in model_configs:
@@ -359,14 +365,25 @@ def evaluate_conformal(max_samples: int = 300):
         print(f"=== Conformal evaluation: {model_name} ===")
         print(f"{'='*60}")
         t0 = time.time()
-        model_results = {}
+
+        # Resume partial regime results for this model (DDPM can be slow)
+        partial_key = f"_partial_{model_name}"
+        model_results = results.pop(partial_key, {})
+        if model_results:
+            print(f"  Resuming {model_name} from {len(model_results)}/{len(REGIMES)} regimes")
 
         for regime in REGIMES:
+            if regime in model_results:
+                print(f"\n  --- {regime} (already done, skipping) ---")
+                continue
+
             print(f"\n  --- {regime} ---")
             ds = LaplacePDEDataset("/data/test_in.npz", regime=regime)
+            actual_cal = min(n_cal, len(ds) // 2)
+            actual_test = min(n_test, len(ds) - actual_cal)
 
-            cal_ds = torch.utils.data.Subset(ds, range(n_cal))
-            test_ds = torch.utils.data.Subset(ds, range(n_cal, n_cal + n_test))
+            cal_ds = torch.utils.data.Subset(ds, range(actual_cal))
+            test_ds = torch.utils.data.Subset(ds, range(actual_cal, actual_cal + actual_test))
             cal_loader = torch.utils.data.DataLoader(cal_ds, batch_size=32)
             test_loader = torch.utils.data.DataLoader(test_ds, batch_size=32)
 
@@ -402,10 +419,21 @@ def evaluate_conformal(max_samples: int = 300):
 
             model_results[regime] = regime_results
 
+            # Per-regime checkpoint for slow models (DDPM)
+            if model_name == "ddpm_improved":
+                results[partial_key] = model_results
+                state = {"results": results, "eval_time_seconds": total_time}
+                with open(partial_path, "w") as f:
+                    json.dump(state, f, indent=2)
+                volume.commit()
+                print(f"  Regime checkpoint saved ({len(model_results)}/{len(REGIMES)})")
+
         elapsed = time.time() - t0
         total_time += elapsed
         print(f"\n  {model_name} completed in {elapsed:.1f}s")
 
+        # Remove partial key, store final results for this model
+        results.pop(partial_key, None)
         results[model_name] = model_results
 
         # Checkpoint after each model

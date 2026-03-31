@@ -146,7 +146,11 @@ def evaluate_conformal_for_model(
         alpha = 1.0 - target
 
         # Raw coverage (no conformal) on test set using Gaussian quantiles
-        z = _NORM_Z.get(target, 1.6449)
+        if target not in _NORM_Z:
+            raise ValueError(
+                f"Unsupported target {target}. Supported: {sorted(_NORM_Z.keys())}"
+            )
+        z = _NORM_Z[target]
         raw_lower = test_mean - z * np.maximum(test_std, 1e-8)
         raw_upper = test_mean + z * np.maximum(test_std, 1e-8)
         raw_covered = (test_truth >= raw_lower) & (test_truth <= raw_upper)
