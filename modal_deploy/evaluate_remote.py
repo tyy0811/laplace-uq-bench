@@ -455,6 +455,99 @@ def evaluate_conformal(max_samples: int = 300):
 @app.function(
     image=image,
     gpu="T4",
+    timeout=3600,
+    volumes={"/data": volume},
+)
+def generate_fig5_data(test_indices=(0, 100, 200)):
+    """Generate predictions from all models for Figure 5 visual comparison.
+
+    Saves .npz with ground truth, regressor, ensemble mean/std, FM samples, DDPM samples.
+    """
+    import numpy as np
+    import torch
+    from diffphys.data.dataset import LaplacePDEDataset
+    from diffphys.model.trainer import build_model, load_config, _build_ddpm
+    from diffphys.model.ensemble import EnsemblePredictor
+    from diffphys.model.flow_matching import ConditionalFlowMatcher
+
+    ds = LaplacePDEDataset("/data/test_in.npz", regime="sparse-noisy")
+    results = {}
+
+    for idx in test_indices:
+        cond, target = ds[idx]
+        cond_gpu = cond.unsqueeze(0).to("cuda")
+        gt = target[0].cpu().numpy()  # (64, 64)
+
+        # Regressor
+        cfg_reg = load_config("/root/configs/unet_regressor.yaml")
+        reg = build_model(cfg_reg["model"]).to("cuda")
+        ckpt = torch.load("/data/experiments/unet_regressor/best.pt", map_location="cuda")
+        reg.load_state_dict(ckpt["model_state_dict"])
+        reg.eval()
+        with torch.no_grad():
+            reg_pred = reg(cond_gpu[:, :8])[0, 0].cpu().numpy()
+
+        # Ensemble
+        cfg_ens = load_config("/root/configs/ensemble_phase2.yaml")
+        models = []
+        for i in range(5):
+            m = build_model(cfg_ens["model"]).to("cuda")
+            ck = torch.load(f"/data/experiments/ensemble_phase2/member_{i}/best.pt", map_location="cuda")
+            m.load_state_dict(ck["model_state_dict"])
+            models.append(m)
+        ens = EnsemblePredictor(models)
+        ens_mean, ens_var = ens.predict(cond_gpu[:, :8])
+        ens_mean_np = ens_mean[0, 0].cpu().numpy()
+        ens_std_np = ens_var.sqrt()[0, 0].cpu().numpy()
+
+        # Flow Matching (5 samples)
+        cfg_fm = load_config("/root/configs/flow_matching.yaml")
+        fm_model = build_model(cfg_fm["model"]).to("cuda")
+        fm_cfg = cfg_fm["flow_matching"]
+        cfm = ConditionalFlowMatcher(
+            fm_model, use_ot=fm_cfg.get("use_ot", True),
+            n_sample_steps=fm_cfg.get("n_sample_steps", 50),
+        ).to("cuda")
+        ckpt = torch.load("/data/experiments/flow_matching/best.pt", map_location="cuda")
+        cfm.load_state_dict(ckpt["model_state_dict"])
+        cfm.eval()
+        fm_samples = cfm.sample(cond_gpu, n_samples=5)[:, 0, 0].cpu().numpy()  # (5, 64, 64)
+
+        # DDPM (5 samples)
+        cfg_ddpm = load_config("/root/configs/ddpm_improved.yaml")
+        ddpm_model = build_model(cfg_ddpm["model"]).to("cuda")
+        ddpm = _build_ddpm(ddpm_model, cfg_ddpm["ddpm"]).to("cuda")
+        ckpt = torch.load("/data/experiments/ddpm_improved/best.pt", map_location="cuda")
+        ddpm.load_state_dict(ckpt["model_state_dict"])
+        ddpm.eval()
+        ddpm_samples = ddpm.sample(cond_gpu, n_samples=5)[:, 0, 0].cpu().numpy()  # (5, 64, 64)
+
+        results[f"idx_{idx}"] = {
+            "ground_truth": gt,
+            "regressor": reg_pred,
+            "ensemble_mean": ens_mean_np,
+            "ensemble_std": ens_std_np,
+            "fm_samples": fm_samples,
+            "ddpm_samples": ddpm_samples,
+            "conditioning": cond.numpy(),
+        }
+        print(f"  Done idx={idx}")
+
+    # Save as npz
+    flat = {}
+    for key, d in results.items():
+        for name, arr in d.items():
+            flat[f"{key}_{name}"] = arr
+
+    out_path = "/data/experiments/fig5_data.npz"
+    np.savez(out_path, **flat)
+    volume.commit()
+    print(f"Saved to {out_path}")
+
+
+@app.function(
+    image=image,
+    gpu="T4",
     timeout=600,
     volumes={"/data": volume},
 )
@@ -536,12 +629,14 @@ def main(eval_type: str, max_samples: int = 300, fresh: bool = False):
         if fresh:
             _clear_partial("experiments/conformal/conformal_partial.json")
         evaluate_conformal.remote(max_samples=max_samples)
+    elif eval_type == "fig5":
+        generate_fig5_data.remote()
     elif eval_type == "diagnose":
         diagnose_ddpm.remote()
     else:
         raise ValueError(
             f"Unknown eval type: {eval_type}. "
-            "Use: phase1, ensemble-uq, ddpm-uq, fm-uq, phase2-all, conformal, diagnose"
+            "Use: phase1, ensemble-uq, ddpm-uq, fm-uq, phase2-all, conformal, fig5, diagnose"
         )
 
 
