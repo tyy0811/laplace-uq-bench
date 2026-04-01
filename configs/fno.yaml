@@ -7,7 +7,7 @@ model:
   n_layers: 4
 
 training:
-  batch_size: 64
+  batch_size: 32
   lr: 1.0e-3
   epochs: 50
   weight_decay: 1.0e-4

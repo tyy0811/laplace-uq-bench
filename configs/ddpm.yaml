@@ -12,9 +12,9 @@ ddpm:
   beta_end: 0.02
 
 training:
-  batch_size: 64
+  batch_size: 32
   lr: 2.0e-4
-  epochs: 100
+  epochs: 60
   weight_decay: 0.0
   scheduler: cosine
 

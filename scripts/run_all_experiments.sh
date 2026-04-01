@@ -23,8 +23,11 @@ echo "=== Phase 2: Probabilistic Models (mixed-regime training) ==="
 echo "Training ensemble (5 members, mixed regime)..."
 python scripts/train.py --config configs/ensemble_phase2.yaml --device cuda
 
-echo "Training DDPM (mixed regime)..."
-python scripts/train.py --config configs/ddpm_phase2.yaml --device cuda
+echo "Training Improved DDPM (cosine schedule, v-prediction, Min-SNR)..."
+python scripts/train.py --config configs/ddpm_improved.yaml --device cuda
+
+echo "Training Flow Matching (mixed regime, OT coupling)..."
+python scripts/train.py --config configs/flow_matching.yaml --device cuda
 
 echo "Phase 2 UQ evaluation..."
 python scripts/evaluate_phase2.py --model-type ensemble \
@@ -33,8 +36,14 @@ python scripts/evaluate_phase2.py --model-type ensemble \
     --output experiments/ensemble_phase2/uq_results.json --device cuda
 
 python scripts/evaluate_phase2.py --model-type ddpm \
-    --config configs/ddpm_phase2.yaml \
-    --checkpoints experiments/ddpm_phase2/best.pt \
-    --output experiments/ddpm_phase2/uq_results.json --device cuda
+    --config configs/ddpm_improved.yaml \
+    --checkpoints experiments/ddpm_improved/best.pt \
+    --n-samples 20 \
+    --output experiments/ddpm_improved/uq_results.json --device cuda
+
+python scripts/evaluate_phase2.py --model-type flow_matching \
+    --config configs/flow_matching.yaml \
+    --checkpoints experiments/flow_matching/best.pt \
+    --output experiments/flow_matching/uq_results.json --device cuda
 
 echo "=== Done ==="

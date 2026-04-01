@@ -62,9 +62,14 @@ class TestOTCouplingMatcher:
         x_0 = torch.randn(8, 1, 4, 4)
         x_1 = torch.randn(8, 1, 4, 4)
         x_0_coupled = matcher.find_coupling(x_0, x_1)
+        # Each output row must come from some input row
+        indices = []
         for i in range(8):
-            found = any(torch.allclose(x_0_coupled[i], x_0[j], atol=1e-6) for j in range(8))
-            assert found, f"Row {i} not found in input"
+            match = [j for j in range(8) if torch.allclose(x_0_coupled[i], x_0[j], atol=1e-6)]
+            assert len(match) >= 1, f"Row {i} not found in input"
+            indices.append(match[0])
+        # Must be a true permutation — no duplicate source indices
+        assert len(set(indices)) == 8, f"Not a permutation: {indices}"
 
 
 class TestConditionalFlowMatcher:

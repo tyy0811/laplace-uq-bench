@@ -9,7 +9,7 @@ import argparse
 
 import torch
 
-from diffphys.model.trainer import load_config, train, train_ddpm, train_ensemble
+from diffphys.model.trainer import load_config, train, train_ddpm, train_cfm, train_ensemble
 
 
 def main():
@@ -35,6 +35,9 @@ def main():
     elif "ddpm" in config:
         print(f"Training DDPM on {device}")
         train_ddpm(config, device=device)
+    elif "flow_matching" in config:
+        print(f"Training Flow Matching on {device}")
+        train_cfm(config, device=device)
     else:
         print(f"Training {config['model']['type']} on {device}")
         train(config, device=device)

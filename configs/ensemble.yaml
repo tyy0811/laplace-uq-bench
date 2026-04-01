@@ -10,7 +10,7 @@ ensemble:
   seeds: [100, 101, 102, 103, 104]
 
 training:
-  batch_size: 64
+  batch_size: 32
   lr: 1.0e-3
   epochs: 50
   weight_decay: 1.0e-4

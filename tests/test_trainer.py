@@ -9,6 +9,8 @@ from pathlib import Path
 from diffphys.model.trainer import (
     build_model,
     build_optimizer,
+    build_scheduler,
+    save_checkpoint,
     train_one_epoch,
     validate,
     load_config,
@@ -139,6 +141,38 @@ class TestTrainEnsemble:
         config["ensemble"] = {"n_members": 5, "seeds": [0, 1]}
         with pytest.raises(ValueError, match="n_members=5 but len\\(seeds\\)=2"):
             train_ensemble(config, device="cpu")
+
+
+class TestSchedulerResume:
+    def test_lr_continuity_across_save_restore(self, config):
+        """Restored scheduler must produce the same LR as uninterrupted training."""
+        model = build_model(config["model"])
+        optimizer = build_optimizer(model, config["training"])
+        scheduler = build_scheduler(optimizer, config["training"])
+
+        # Run 1 epoch, save checkpoint with scheduler
+        scheduler.step()
+        lr_after_epoch1 = optimizer.param_groups[0]["lr"]
+
+        import tempfile, os
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "ckpt.pt")
+            save_checkpoint(model, optimizer, 0, 1.0, path, scheduler)
+
+            # Create fresh optimizer+scheduler and restore
+            optimizer2 = build_optimizer(model, config["training"])
+            scheduler2 = build_scheduler(optimizer2, config["training"])
+            ckpt = torch.load(path, map_location="cpu")
+            optimizer2.load_state_dict(ckpt["optimizer_state_dict"])
+            scheduler2.load_state_dict(ckpt["scheduler_state_dict"])
+
+            # Next step should match what uninterrupted training would give
+            scheduler.step()
+            scheduler2.step()
+            lr_uninterrupted = optimizer.param_groups[0]["lr"]
+            lr_restored = optimizer2.param_groups[0]["lr"]
+            assert lr_restored == pytest.approx(lr_uninterrupted, rel=1e-6), \
+                f"LR diverged: restored={lr_restored}, expected={lr_uninterrupted}"
 
 
 class TestLoadConfig:

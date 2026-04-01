@@ -200,12 +200,50 @@ def figure_interval_widths():
 
 
 # ---------------------------------------------------------------------------
+# Figure 7: Functional CRPS bar chart (matched 5v5)
+# ---------------------------------------------------------------------------
+
+def figure_7_functional_crps():
+    """Bar chart comparing functional CRPS across models for 5 derived quantities."""
+    data = load_json("experiments/functional_crps/functional_crps_results.json")["results"]
+
+    quantities = ["center_T", "subregion_mean_T", "max_interior_T", "dirichlet_energy", "top_edge_flux"]
+    labels = ["Center T", "Subregion\nMean T", "Max\nInterior T", "Dirichlet\nEnergy", "Top Edge\nFlux"]
+    models = [("ensemble", "Ensemble"), ("flow_matching", "Flow Matching"), ("ddpm_improved", "Improved DDPM")]
+    colors = ["#2196F3", "#FF9800", "#4CAF50"]
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+
+    x = np.arange(len(quantities))
+    width = 0.25
+
+    for i, (model_key, model_label) in enumerate(models):
+        vals = [data[model_key][f"mean_crps_{q}"] for q in quantities]
+        errs = [data[model_key][f"std_crps_{q}"] for q in quantities]
+        ax.bar(x + i * width, vals, width, label=model_label, color=colors[i],
+               yerr=errs, capsize=3, alpha=0.85)
+
+    ax.set_ylabel("CRPS (lower is better)", fontsize=12)
+    ax.set_title("Functional CRPS — Matched 5 Samples (Sparse-Noisy Regime)", fontsize=13)
+    ax.set_xticks(x + width)
+    ax.set_xticklabels(labels, fontsize=10)
+    ax.legend(fontsize=11)
+    ax.grid(True, alpha=0.3, axis="y")
+
+    plt.tight_layout()
+    out = FIGURES_DIR / "fig7_functional_crps.png"
+    fig.savefig(out, dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"Saved {out}")
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--figure", type=str, help="Figure number to generate (9, 9b, 10, widths)")
+    parser.add_argument("--figure", type=str, help="Figure number to generate (7, 9, 9b, 10, widths)")
     parser.add_argument("--all", action="store_true", help="Generate all figures")
     args = parser.parse_args()
 
@@ -219,6 +257,8 @@ def main():
         figure_10_convergence()
     if args.all or args.figure == "widths":
         figure_interval_widths()
+    if args.all or args.figure == "7":
+        figure_7_functional_crps()
 
     if args.all:
         print(f"\nAll figures saved to {FIGURES_DIR}/")

@@ -7,7 +7,7 @@ Interpolant: x_t = (1-t)*x_0 + t*x_1, x_0 ~ N(0,I), x_1 = data
 Target: u_t = x_1 - x_0 (constant velocity)
 Loss: ||v_theta(x_t, t, cond) - u_t||^2
 
-OT-CFM: Sinkhorn coupling within mini-batch for straighter flows.
+OT-CFM: Hungarian OT coupling within mini-batch for straighter flows.
 """
 
 import torch
@@ -36,29 +36,25 @@ class FlowMatchingSchedule:
 
 
 class OTCouplingMatcher:
-    """Mini-batch optimal transport via Sinkhorn for straighter flows."""
-
-    def __init__(self, reg=0.05, max_iter=50):
-        self.reg = reg
-        self.max_iter = max_iter
+    """Mini-batch optimal transport coupling for straighter flows."""
 
     @torch.no_grad()
     def find_coupling(self, x_0, x_1):
-        """Find OT permutation within mini-batch."""
+        """Find OT permutation within mini-batch.
+
+        Uses squared-Euclidean cost with Hungarian algorithm to extract
+        a true permutation (no duplicates).
+        """
+        from scipy.optimize import linear_sum_assignment
+
         B = x_0.shape[0]
         x0_flat = x_0.reshape(B, -1)
         x1_flat = x_1.reshape(B, -1)
 
         C = torch.cdist(x0_flat, x1_flat, p=2).pow(2)
-        K = torch.exp(-C / self.reg)
-        u = torch.ones(B, device=x_0.device)
-
-        for _ in range(self.max_iter):
-            v = 1.0 / (K.T @ u + 1e-8)
-            u = 1.0 / (K @ v + 1e-8)
-
-        T = u[:, None] * K * v[None, :]
-        perm = T.argmax(dim=1)
+        # For each target j, find the best source i (transpose so rows=targets)
+        _, perm = linear_sum_assignment(C.T.cpu().numpy())
+        perm = torch.tensor(perm, device=x_0.device, dtype=torch.long)
         return x_0[perm]
 
 
@@ -68,15 +64,14 @@ class ConditionalFlowMatcher(nn.Module):
     Args:
         model: ConditionalUNet(in_ch=9, out_ch=1, time_emb_dim=256).
         use_ot: Whether to use OT coupling.
-        ot_reg: Sinkhorn regularization.
         n_sample_steps: Euler steps for ODE sampling.
     """
 
-    def __init__(self, model, use_ot=True, ot_reg=0.05, n_sample_steps=50):
+    def __init__(self, model, use_ot=True, n_sample_steps=50):
         super().__init__()
         self.model = model
         self.schedule = FlowMatchingSchedule()
-        self.ot_matcher = OTCouplingMatcher(reg=ot_reg) if use_ot else None
+        self.ot_matcher = OTCouplingMatcher() if use_ot else None
         self.n_sample_steps = n_sample_steps
 
     def _predict_velocity(self, x_t, conditioning, t):

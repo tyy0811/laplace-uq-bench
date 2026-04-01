@@ -43,9 +43,14 @@ class SpatialConformalPredictor:
         scores = residuals / sigma_safe
         sample_scores = scores.max(axis=(1, 2))  # spatial max per sample
 
-        quantile_level = np.ceil((N + 1) * (1 - self.alpha)) / N
-        quantile_level = min(quantile_level, 1.0)
-        self.q_hat = np.quantile(sample_scores, quantile_level)
+        # Exact order statistic — no interpolation — for finite-sample guarantee
+        # k is 1-indexed: the k-th smallest score
+        k = int(np.ceil((N + 1) * (1 - self.alpha)))
+        sorted_scores = np.sort(sample_scores)
+        if k > N:
+            self.q_hat = float("inf")
+        else:
+            self.q_hat = float(sorted_scores[k - 1])
         return self.q_hat
 
     def predict_intervals(self, predictions, uncertainties):
@@ -83,9 +88,14 @@ class PixelwiseConformalPredictor:
         scores = (residuals / sigma_safe).flatten()
 
         N = len(scores)
-        quantile_level = np.ceil((N + 1) * (1 - self.alpha)) / N
-        quantile_level = min(quantile_level, 1.0)
-        self.q_hat = np.quantile(scores, quantile_level)
+        # Exact order statistic — no interpolation — for finite-sample guarantee
+        # k is 1-indexed: the k-th smallest score
+        k = int(np.ceil((N + 1) * (1 - self.alpha)))
+        sorted_scores = np.sort(scores)
+        if k > N:
+            self.q_hat = float("inf")
+        else:
+            self.q_hat = float(sorted_scores[k - 1])
         return self.q_hat
 
     def predict_intervals(self, predictions, uncertainties):
