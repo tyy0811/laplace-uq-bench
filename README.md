@@ -11,8 +11,8 @@ We compare five neural surrogates for 2D Laplace equation solution fields: a det
 - Under exact BCs, a Phase 2 DDPM 5-sample mean achieves 5x lower PDE residual than U-Net regression, but at 200x the inference cost — the FD solver remains faster and more accurate (caveat: DDPM was trained on mixed regimes, giving it an advantage on exact-BC test data)
 - Under sparse noisy observations, generative models maintain 84-97% raw coverage while the ensemble collapses to 15-31%
 - Conformal prediction lifts all methods to near-nominal 90% coverage, but DDPM produces intervals 2-3x tighter than the ensemble
-- The training improvements (Min-SNR + cosine schedule + v-prediction) were more impactful than the choice of generative framework — improved DDPM outperforms flow matching on functional CRPS despite FM's simpler training objective
-- On held-out piecewise BCs, all models degrade but DDPM maintains the best calibration across all 5 observation regimes, suggesting the generative prior captures transferable solution structure
+- In this benchmark, the training improvements (Min-SNR + cosine schedule + v-prediction) were more impactful than the choice of generative framework — improved DDPM outperforms flow matching on functional CRPS despite FM's simpler training objective
+- On held-out piecewise BCs, all models degrade but DDPM maintains the lowest calibration error (vs. ensemble) across all 5 observation regimes, suggesting but not proving that the generative prior captures transferable solution structure
 
 ---
 
@@ -35,7 +35,7 @@ Three tables below; full 7-table breakdown in [docs/benchmark_results.md](docs/b
 
 On OOD piecewise BCs, the same DDPM has the lowest PDE residual (4.68) but higher BC error (0.077) — the generative model captures interior physics well but struggles with unseen boundary families. Full OOD accuracy numbers in [benchmark_results.md](docs/benchmark_results.md).
 
-### Phase 2: UQ Across Observation Regimes (In-Distribution, Conformal@90%)
+### Phase 2: UQ Across Observation Regimes (In-Distribution, Pixelwise Conformal@90%)
 
 | Regime | Ens raw@90 | FM raw@90 | DDPM raw@90 | Ens width | FM width | DDPM width | DDPM func. CRPS† |
 |--------|-----------|----------|------------|----------|---------|-----------|-----------------|
@@ -46,6 +46,8 @@ On OOD piecewise BCs, the same DDPM has the lowest PDE residual (4.68) but highe
 | very-sparse | 15.4% | 83.8% | 83.7% | 0.376 | 0.331 | **0.248** | — |
 
 †Center-T CRPS at matched 5v5 (sparse-noisy only). DDPM wins all 5 functionals; full CRPS table in [benchmark_results.md](docs/benchmark_results.md).
+
+All coverage and interval width values use pixelwise (marginal) conformal prediction, not the spatial/simultaneous variant. Generative models use 20 samples for mean/std estimation; the ensemble uses 5 members. These are not matched-sample comparisons — see Table 4 / functional CRPS for a matched 5v5 evaluation.
 
 After conformal calibration, all methods achieve near-nominal 90% coverage. But DDPM consistently produces the tightest intervals — 2-3x sharper than ensemble — indicating the best-calibrated raw uncertainty. Ensemble raw coverage degrades severely under noise (81% → 15%), while generative models maintain 84-97%.
 
@@ -64,6 +66,8 @@ After conformal calibration, all methods achieve near-nominal 90% coverage. But 
 
 The generalization gap **widens under observation uncertainty**: ensemble coverage drops from 65% to 16% across regimes, while generative models hold 74-87%. Ensemble CRPS is lowest on 4 of 5 regimes because its predictions are accurate on average, but its uncertainty is too narrow — producing tight intervals that frequently miss the ground truth. DDPM's slightly higher CRPS reflects wider intervals that actually contain the truth. At very-sparse, where the observation gap is largest, DDPM overtakes ensemble on CRPS as well.
 
+Note: FM calibration error is not reported in this table; the claim that DDPM has the lowest calibration error is relative to the ensemble only.
+
 ![Conformal calibration curves](figures/fig9_conformal_calibration.png)
 *Raw coverage (dashed) vs conformalized coverage (solid) at 50/90/95% targets, averaged across regimes. Conformal prediction lifts all methods to the diagonal, but the raw gap shows how much correction each method needs — DDPM starts closest to nominal.*
 
@@ -73,7 +77,7 @@ The generalization gap **widens under observation uncertainty**: ensemble covera
 
 **Deep Ensemble (5 U-Net regressors).** Five independently trained regressors with random initialization and data shuffling. Predictive uncertainty is the pixelwise variance across members. This is the fairness bar: a probabilistic non-generative baseline that captures epistemic uncertainty from seed diversity alone. If DDPM wins on calibration, the interpretation is "DDPM captures richer posterior structure than seed-diversity alone," not "DDPM captures the true posterior."
 
-**Conditional Flow Matching (OT-CFM).** Learns a velocity field transporting Gaussian noise to solution fields, conditioned on boundary observations. Uses mini-batch optimal transport (Hungarian algorithm) coupling for straighter learned flows — the OT coupling minimizes transport cost, analogous to the Benamou-Brenier formulation in optimal transport theory. Sampling is a 50-step Euler ODE solve. Despite simpler training dynamics (no noise schedule), FM underperforms DDPM on most metrics, suggesting the training improvements matter more than the generative framework.
+**Conditional Flow Matching (OT-CFM).** Learns a velocity field transporting Gaussian noise to solution fields, conditioned on boundary observations. Uses mini-batch optimal transport (Hungarian algorithm) coupling for straighter learned flows — the OT coupling minimizes transport cost, analogous to the Benamou-Brenier formulation in optimal transport theory. Sampling is a 50-step Euler ODE solve. Despite simpler training dynamics (no noise schedule), FM underperforms DDPM on most metrics in this benchmark, suggesting the training improvements mattered more than the generative framework in this setup.
 
 **Improved DDPM.** Standard DDPM trained for 60 epochs achieved only 16.8% raw coverage due to undertraining — the loss was still decreasing but the model hadn't learned the full noise-level spectrum. Three targeted fixes solved this: cosine noise schedule (better noise distribution for 64x64 data), v-prediction parameterization (numerically stable across all noise levels), and Min-SNR-gamma weighting (3.4x convergence speedup by rebalancing the loss across timesteps). These compound to give 85-99% raw coverage at the same 80-epoch training budget.
 
@@ -97,7 +101,9 @@ The generalization gap **widens under observation uncertainty**: ensemble covera
 
 **FNO is undertrained.** The FNO baseline (rel. L2 ~0.40) is likely undersized for this problem. It was not tuned further since the project focus is the ensemble/DDPM comparison. FNO was not retrained for Phase 2.
 
-**Phase 3 (physics-regularized DDPM) is not yet trained.** Code and config exist (`src/diffphys/model/physics_ddpm.py`) but no experimental results are available.
+**Single-run results.** All numbers are from single trained checkpoints with fixed random seeds. No cross-seed variance is reported. Rankings could shift with different initializations.
+
+**The physics-regularization experiment (physics-regularized DDPM) is not yet trained.** Code and config exist (`src/diffphys/model/physics_ddpm.py`) but no experimental results are available.
 
 ---
 
@@ -163,4 +169,4 @@ Training runs on Modal T4 GPUs with checkpoints saved every 20 epochs to a persi
 5. Vovk, V., Gammerman, A., & Shafer, G. (2005). *Algorithmic Learning in a Random World*. Springer.
 6. Nichol, A. & Dhariwal, P. (2021). Improved Denoising Diffusion Probabilistic Models. *ICML*.
 7. Salimans, T. & Ho, J. (2022). Progressive Distillation for Fast Sampling of Diffusion Models. *ICLR*.
-8. Hang, T. et al. (2023). Efficient Diffusion Training via Min-SNR Weighting Strategy. *CVPR*.
+8. Hang, T. et al. (2023). Efficient Diffusion Training via Min-SNR Weighting Strategy. *ICCV*.

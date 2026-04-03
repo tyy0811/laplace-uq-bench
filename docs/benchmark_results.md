@@ -1,6 +1,6 @@
 # Detailed Benchmark Results
 
-Full results tables referenced from the main README. All results computed on Modal T4 GPUs with per-model checkpointing.
+Full results tables referenced from the main README. All results computed on Modal T4 GPUs with per-model checkpointing. Unless otherwise noted, conformal results use pixelwise (marginal) calibration, not the spatial/simultaneous variant. All numbers are from single trained checkpoints with fixed random seeds; no cross-seed variance is reported.
 
 ---
 
@@ -61,7 +61,7 @@ CRPS (lower is better) evaluated on 300 test samples with **matched 5 samples pe
 | sparse-noisy | 31.2% | 89.4% | 85.4% | 91.3% | 89.9% | 88.8% | 0.135 | 0.131 | 0.088 |
 | very-sparse | 15.4% | 83.8% | 83.7% | 90.4% | 87.9% | 88.1% | 0.376 | 0.331 | 0.248 |
 
-All coverage/width values use pixelwise conformal prediction at 90% target.
+All coverage/width values use pixelwise conformal prediction at 90% target. Generative models use 20 samples for mean/std estimation; the ensemble uses 5 members. For a matched-sample comparison, see Table 4 (functional CRPS, 5v5).
 
 ## Table 6: OOD Generalization — Held-Out Piecewise BCs (All 5 Regimes)
 
@@ -82,7 +82,7 @@ All coverage/width values use pixelwise conformal prediction at 90% target.
 | sparse-noisy | 39.0% | 76.9% | 77.0% | **0.026** | 0.041 | 0.028 | 0.315 | **0.084** |
 | very-sparse | 16.4% | 76.2% | 73.7% | 0.068 | 0.080 | **0.066** | 0.425 | **0.122** |
 
-Ensemble CRPS is lowest on 4 of 5 regimes because its predictions are accurate on average, but its uncertainty is too narrow — producing tight intervals that frequently miss the ground truth. DDPM's slightly higher CRPS reflects wider intervals that actually contain the truth (86% vs 65% coverage at 90% target). At very-sparse, where the observation gap is largest, DDPM overtakes ensemble on CRPS as well.
+FM calibration error is not reported; the calibration-error comparison is between DDPM and ensemble only. Ensemble CRPS is lowest on 4 of 5 regimes because its predictions are accurate on average, but its uncertainty is too narrow — producing tight intervals that frequently miss the ground truth. DDPM's slightly higher CRPS reflects wider intervals that actually contain the truth (86% vs 65% coverage at 90% target). At very-sparse, where the observation gap is largest, DDPM overtakes ensemble on CRPS as well.
 
 ## Table 7: Computational Cost
 
