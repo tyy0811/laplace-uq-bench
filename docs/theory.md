@@ -35,9 +35,13 @@
 
 We study the **steady-state heat equation** (Laplace's equation) on the unit square $\Omega = [0,1]^2$ with Dirichlet boundary conditions:
 
-$$\nabla^2 T(x,y) = \frac{\partial^2 T}{\partial x^2} + \frac{\partial^2 T}{\partial y^2} = 0 \quad \text{on } \Omega \tag{1.1}$$
+$$
+\nabla^2 T(x,y) = \frac{\partial^2 T}{\partial x^2} + \frac{\partial^2 T}{\partial y^2} = 0 \quad \text{on } \Omega \tag{1.1}
+$$
 
-$$T = g(x,y) \quad \text{on } \partial\Omega \tag{1.2}$$
+$$
+T = g(x,y) \quad \text{on } \partial\Omega \tag{1.2}
+$$
 
 where $T(x,y)$ is the temperature field and $g(x,y)$ prescribes the boundary profile. Laplace's equation arises as the equilibrium limit of the heat equation $\partial_t T = \kappa \nabla^2 T$ — when all transient behavior has decayed, the temperature distribution satisfies (1.1). It is the prototypical second-order elliptic PDE: linear, self-adjoint, and admits a unique classical solution for any continuous Dirichlet data $g$ on a bounded domain with smooth boundary.
 
@@ -84,7 +88,9 @@ The Phase 2 comparison tests three UQ approaches: **(1)** improved DDPM (§8) wi
 
 **Consequence for evaluation.** The maximum principle provides a physics-based test: for any neural surrogate prediction $\hat{T}$, every interior point must satisfy
 
-$$\min_{\partial\Omega} g \leq \hat{T}(x,y) \leq \max_{\partial\Omega} g \quad \forall (x,y) \in \Omega. \tag{2.1}$$
+$$
+\min_{\partial\Omega} g \leq \hat{T}(x,y) \leq \max_{\partial\Omega} g \quad \forall (x,y) \in \Omega. \tag{2.1}
+$$
 
 Violations of (2.1) are unphysical and indicate that the surrogate has not learned the elliptic structure. This is implemented in `src/diffphys/evaluation/physics.py:check_maximum_principle()`.
 
@@ -96,21 +102,29 @@ We discretize $\Omega$ on a uniform grid with spacing $h = 1/(N-1)$, where $N = 
 
 **The 5-point stencil.** At each interior point $(i,j)$ with $1 \leq i,j \leq N-2$, the Laplacian is approximated by the standard second-order central difference (LeVeque, 2007, Ch. 3):
 
-$$\nabla^2 T \approx \frac{T_{i+1,j} + T_{i-1,j} + T_{i,j+1} + T_{i,j-1} - 4T_{i,j}}{h^2} = 0. \tag{2.2}$$
+$$
+\nabla^2 T \approx \frac{T_{i+1,j} + T_{i-1,j} + T_{i,j+1} + T_{i,j-1} - 4T_{i,j}}{h^2} = 0. \tag{2.2}
+$$
 
 This yields the linear system:
 
-$$L \mathbf{u} = \mathbf{b} \tag{2.3}$$
+$$
+L \mathbf{u} = \mathbf{b} \tag{2.3}
+$$
 
 where $\mathbf{u} \in \mathbb{R}^{(N-2)^2}$ contains the interior unknowns (row-major ordering), $L$ is the sparse $(N-2)^2 \times (N-2)^2$ Laplacian matrix, and $\mathbf{b}$ absorbs the boundary values.
 
 **Construction of $L$.** [Exact.] Using row-major indexing $k = i \cdot (N-2) + j$ for the interior grid $(i,j) \in \{0, \ldots, N-3\}^2$, the Laplacian matrix has the block tridiagonal structure:
 
-$$L = \frac{1}{h^2} \begin{pmatrix} B_L & I & & \\ I & B_L & I & \\ & \ddots & \ddots & \ddots \\ & & I & B_L \end{pmatrix} \tag{2.4}$$
+$$
+L = \frac{1}{h^2} \begin{pmatrix} B_L & I & & \\ I & B_L & I & \\ & \ddots & \ddots & \ddots \\ & & I & B_L \end{pmatrix} \tag{2.4}
+$$
 
 where $B_L$ is the $(N-2) \times (N-2)$ tridiagonal matrix
 
-$$B_L = \begin{pmatrix} -4 & 1 & & \\ 1 & -4 & 1 & \\ & \ddots & \ddots & \ddots \\ & & 1 & -4 \end{pmatrix} \tag{2.5}$$
+$$
+B_L = \begin{pmatrix} -4 & 1 & & \\ 1 & -4 & 1 & \\ & \ddots & \ddots & \ddots \\ & & 1 & -4 \end{pmatrix} \tag{2.5}
+$$
 
 and $I$ is the $(N-2) \times (N-2)$ identity matrix.
 
@@ -120,7 +134,9 @@ and $I$ is the $(N-2) \times (N-2)$ identity matrix.
 
 **LU factorization and reuse.** [Exact.] Since $L$ depends only on the grid size $N$ and not on the boundary data $g$, we compute the sparse LU factorization $L = P^{-1} L' U'$ once using `scipy.sparse.linalg.splu`. Each subsequent solve requires only forward/backward substitution:
 
-$$\mathbf{u} = L^{-1} \mathbf{b} \quad \text{via } \texttt{lu\_factor.solve(b)} \tag{2.6}$$
+$$
+\mathbf{u} = L^{-1} \mathbf{b} \quad \text{via } \text{lu\_factor.solve(b)} \tag{2.6}
+$$
 
 Cost per solve: $O((N-2)^2)$ flops for back-substitution. On a modern laptop CPU, each solve takes on the order of 0.5ms for $N=64$; generating 50,000 solutions takes on the order of 25 seconds. (Exact timings are hardware-dependent.)
 
@@ -140,11 +156,15 @@ Three distinct numerical quantities should not be confused:
 
 For the boundary condition $T(x,0) = 0$, $T(x,1) = \sin(\pi x)$, $T(0,y) = T(1,y) = 0$, the exact solution is:
 
-$$T_{\text{exact}}(x,y) = \sin(\pi x) \frac{\sinh(\pi y)}{\sinh(\pi)} \tag{2.7}$$
+$$
+T_{\text{exact}}(x,y) = \sin(\pi x) \frac{\sinh(\pi y)}{\sinh(\pi)} \tag{2.7}
+$$
 
 **[Derivation.]** We seek a separable solution $T(x,y) = X(x) Y(y)$. Substituting into (1.1):
 
-$$X''Y + XY'' = 0 \implies \frac{X''}{X} = -\frac{Y''}{Y} = -\lambda \tag{2.8}$$
+$$
+X''Y + XY'' = 0 \implies \frac{X''}{X} = -\frac{Y''}{Y} = -\lambda \tag{2.8}
+$$
 
 The $x$-equation $X'' + \lambda X = 0$ with $X(0) = X(1) = 0$ has eigenvalues $\lambda_n = n^2 \pi^2$ and eigenfunctions $X_n = \sin(n\pi x)$. The $y$-equation $Y'' - n^2\pi^2 Y = 0$ with $Y(0) = 0$ gives $Y_n = \sinh(n\pi y)$. The top boundary condition $T(x,1) = \sin(\pi x)$ selects $n=1$ with coefficient $1/\sinh(\pi)$, yielding (2.7). $\square$
 
@@ -161,11 +181,15 @@ The boundary profile $g$ on each of the four edges is generated to produce a div
 
 **Edge profile construction.** For an edge parameterized by $x \in [0,1]$ with corner values $c_{\text{start}}$ and $c_{\text{end}}$:
 
-$$g(x) = \underbrace{c_{\text{start}} + (c_{\text{end}} - c_{\text{start}}) x}_{\text{linear baseline}} + \underbrace{4x(1-x) \cdot p(x)}_{\text{perturbation}} \tag{2.9}$$
+$$
+g(x) = \underbrace{c_{\text{start}} + (c_{\text{end}} - c_{\text{start}}) x}_{\text{linear baseline}} + \underbrace{4x(1-x) \cdot p(x)}_{\text{perturbation}} \tag{2.9}
+$$
 
 where $p(x)$ is drawn from one of five families (§2.4.1 below). The envelope $4x(1-x)$ forces the perturbation to vanish at $x=0$ and $x=1$:
 
-$$4 \cdot 0 \cdot (1-0) \cdot p(0) = 0, \quad 4 \cdot 1 \cdot (1-1) \cdot p(1) = 0 \tag{2.10}$$
+$$
+4 \cdot 0 \cdot (1-0) \cdot p(0) = 0, \quad 4 \cdot 1 \cdot (1-1) \cdot p(1) = 0 \tag{2.10}
+$$
 
 guaranteeing $g(0) = c_{\text{start}}$ and $g(1) = c_{\text{end}}$ regardless of $p$. [Exact.]
 
@@ -176,15 +200,21 @@ The factor 4 normalizes the envelope to have maximum value 1 at $x = 1/2$, so th
 Five families of perturbation functions $p(x)$ define the BC diversity:
 
 **Family 1 — Sinusoidal:**
-$$p(x) = A \sin(n\pi x), \quad A \sim \text{Uniform}(0.5, 2.0), \quad n \sim \text{Uniform}\{1,2,3,4\} \tag{2.11}$$
+$$
+p(x) = A \sin(n\pi x), \quad A \sim \text{Uniform}(0.5, 2.0), \quad n \sim \text{Uniform}\{1,2,3,4\} \tag{2.11}
+$$
 
 **Family 2 — Random Fourier:**
-$$p(x) = \sum_{k=1}^{K} a_k \sin(k\pi x), \quad a_k \sim \mathcal{N}(0, 1/k^2), \quad K = 5 \tag{2.12}$$
+$$
+p(x) = \sum_{k=1}^{K} a_k \sin(k\pi x), \quad a_k \sim \mathcal{N}(0, 1/k^2), \quad K = 5 \tag{2.12}
+$$
 
 The $1/k^2$ variance decay produces smooth, band-limited profiles. The Karhunen-Loève-like structure ensures that low-frequency modes dominate, yielding physically plausible boundary conditions.
 
 **Family 3 — Gaussian bump:**
-$$p(x) = A \exp\!\left(-\frac{(x - \mu)^2}{2\sigma^2}\right), \quad A \sim \text{Uniform}(0.5, 3.0), \quad \mu \sim \text{Uniform}(0.3, 0.7) \tag{2.13}$$
+$$
+p(x) = A \exp\!\left(-\frac{(x - \mu)^2}{2\sigma^2}\right), \quad A \sim \text{Uniform}(0.5, 3.0), \quad \mu \sim \text{Uniform}(0.3, 0.7) \tag{2.13}
+$$
 
 with $\sigma$ fixed at 0.1. The bump is localized, testing whether surrogates capture local boundary features.
 
@@ -212,11 +242,15 @@ All neural surrogates receive boundary information through a standardized $(8, 6
 
 Mathematically, for the top edge with profile $g_{\text{top}} \in \mathbb{R}^{64}$ and mask $m_{\text{top}} \in \{0,1\}^{64}$:
 
-$$C_0[i,j] = g_{\text{top}}[j], \quad C_4[i,j] = m_{\text{top}}[j] \quad \forall\, i \in \{0,\ldots,63\} \tag{2.14}$$
+$$
+C_0[i,j] = g_{\text{top}}[j], \quad C_4[i,j] = m_{\text{top}}[j] \quad \forall\, i \in \{0,\ldots,63\} \tag{2.14}
+$$
 
 and for the left edge with profile $g_{\text{left}} \in \mathbb{R}^{64}$ and mask $m_{\text{left}} \in \{0,1\}^{64}$:
 
-$$C_2[i,j] = g_{\text{left}}[i], \quad C_6[i,j] = m_{\text{left}}[i] \quad \forall\, j \in \{0,\ldots,63\} \tag{2.15}$$
+$$
+C_2[i,j] = g_{\text{left}}[i], \quad C_6[i,j] = m_{\text{left}}[i] \quad \forall\, j \in \{0,\ldots,63\} \tag{2.15}
+$$
 
 *Implemented in `src/diffphys/data/conditioning.py:encode_bcs()`. Tested in `tests/test_conditioning.py`.*
 
@@ -230,34 +264,48 @@ The U-Net is an encoder-decoder convolutional network with skip connections (Ron
 
 **Architecture.** The encoder applies a sequence of residual blocks and spatial downsampling:
 
-$$\mathbf{h}_0^{\text{enc}} = \text{Conv}_{3 \times 3}(\mathbf{C}; 8 \to 64) \tag{3.1}$$
-$$\mathbf{h}_\ell^{\text{enc}} = \text{Down}(\text{ResBlock}(\mathbf{h}_{\ell-1}^{\text{enc}}; c_\ell)), \quad \ell = 1, 2, 3 \tag{3.2}$$
+$$
+\mathbf{h}_0^{\text{enc}} = \text{Conv}_{3 \times 3}(\mathbf{C}; 8 \to 64) \tag{3.1}
+$$
+$$
+\mathbf{h}_\ell^{\text{enc}} = \text{Down}(\text{ResBlock}(\mathbf{h}_{\ell-1}^{\text{enc}}; c_\ell)), \quad \ell = 1, 2, 3 \tag{3.2}
+$$
 
 with channel multipliers $(c_1, c_2, c_3, c_4) = (64, 128, 256, 256)$ and spatial resolutions $(64, 32, 16, 8)$. Self-attention is applied at the $16 \times 16$ level ($\ell = 2$).
 
 **Residual block.** Each ResBlock applies two convolutions with GroupNorm (Wu & He, 2018) and SiLU activation:
 
-$$\text{ResBlock}(\mathbf{x}; c) = \mathbf{x} + \text{Conv}(\text{SiLU}(\text{GN}(\text{Conv}(\text{SiLU}(\text{GN}(\mathbf{x})))))) \tag{3.3}$$
+$$
+\text{ResBlock}(\mathbf{x}; c) = \mathbf{x} + \text{Conv}(\text{SiLU}(\text{GN}(\text{Conv}(\text{SiLU}(\text{GN}(\mathbf{x})))))) \tag{3.3}
+$$
 
 with a $1 \times 1$ projection on the skip path if the channel count changes.
 
 **Bottleneck.** At the coarsest resolution ($8 \times 8$, 256 channels):
 
-$$\mathbf{h}_{\text{bot}} = \text{ResBlock}(\text{Attn}(\text{ResBlock}(\mathbf{h}_3^{\text{enc}}))) \tag{3.4}$$
+$$
+\mathbf{h}_{\text{bot}} = \text{ResBlock}(\text{Attn}(\text{ResBlock}(\mathbf{h}_3^{\text{enc}}))) \tag{3.4}
+$$
 
 **Decoder.** The decoder upsamples and concatenates skip connections:
 
-$$\mathbf{h}_\ell^{\text{dec}} = \text{ResBlock}([\text{Up}(\mathbf{h}_{\ell+1}^{\text{dec}}); \mathbf{h}_\ell^{\text{enc}}]), \quad \ell = 2, 1, 0 \tag{3.5}$$
+$$
+\mathbf{h}_\ell^{\text{dec}} = \text{ResBlock}([\text{Up}(\mathbf{h}_{\ell+1}^{\text{dec}}); \mathbf{h}_\ell^{\text{enc}}]), \quad \ell = 2, 1, 0 \tag{3.5}
+$$
 
 where $[\cdot\,;\cdot]$ denotes channel-wise concatenation and $\text{Up}$ is nearest-neighbor upsampling followed by $3 \times 3$ convolution.
 
 **Output.** A final $3 \times 3$ convolution projects to the predicted field:
 
-$$\hat{T} = \text{Conv}_{3 \times 3}(\mathbf{h}_0^{\text{dec}}; 64 \to 1) \tag{3.6}$$
+$$
+\hat{T} = \text{Conv}_{3 \times 3}(\mathbf{h}_0^{\text{dec}}; 64 \to 1) \tag{3.6}
+$$
 
 **Loss.** Mean squared error against the ground-truth field:
 
-$$\mathcal{L}_{\text{MSE}} = \frac{1}{N^2} \sum_{i,j} (\hat{T}_{i,j} - T_{i,j}^{\text{true}})^2 \tag{3.7}$$
+$$
+\mathcal{L}_{\text{MSE}} = \frac{1}{N^2} \sum_{i,j} (\hat{T}_{i,j} - T_{i,j}^{\text{true}})^2 \tag{3.7}
+$$
 
 *Implemented in `src/diffphys/model/unet.py` (backbone) and `model/regressor.py` (MSE wrapper). Trained by `model/train_regressor.py`. ~5M parameters.*
 
@@ -267,7 +315,9 @@ The FNO learns an operator mapping between function spaces rather than point-to-
 
 **Spectral convolution.** [Following Li et al. (2021).] For input function $v: \Omega \to \mathbb{R}^{d_v}$, the spectral convolution layer computes:
 
-$$(\mathcal{K}v)(x) = \mathcal{F}^{-1}\!\left(R_\phi \cdot \mathcal{F}(v)\right)(x) \tag{3.8}$$
+$$
+(\mathcal{K}v)(x) = \mathcal{F}^{-1}\!\left(R_\phi \cdot \mathcal{F}(v)\right)(x) \tag{3.8}
+$$
 
 where $\mathcal{F}$ denotes the 2D discrete Fourier transform, $R_\phi \in \mathbb{C}^{k_{\max,1} \times k_{\max,2} \times d_v \times d_v}$ is a learnable complex-valued weight tensor (with $k_{\max}$ modes retained in each spatial frequency dimension), and the product truncates to the lowest $k_{\max}$ Fourier modes per axis.
 
@@ -275,7 +325,9 @@ where $\mathcal{F}$ denotes the 2D discrete Fourier transform, $R_\phi \in \math
 
 **Full FNO layer.** Each layer combines the spectral convolution with a pointwise linear transform:
 
-$$v_{\ell+1}(x) = \sigma\!\left((\mathcal{K}_\ell v_\ell)(x) + W_\ell v_\ell(x)\right) \tag{3.9}$$
+$$
+v_{\ell+1}(x) = \sigma\!\left((\mathcal{K}_\ell v_\ell)(x) + W_\ell v_\ell(x)\right) \tag{3.9}
+$$
 
 where $W_\ell \in \mathbb{R}^{d_v \times d_v}$ is a pointwise (i.e., $1 \times 1$ convolution) weight matrix and $\sigma$ is the GeLU activation. The local path $W_\ell v_\ell$ captures high-frequency residuals not represented by the truncated spectral path.
 
@@ -294,15 +346,21 @@ where $W_\ell \in \mathbb{R}^{d_v \times d_v}$ is a pointwise (i.e., $1 \times 1
 
 **Epistemic uncertainty from seed diversity.** A deep ensemble consists of $M = 5$ copies of the U-Net regressor (§3.1), each trained independently with a different random seed $s_m$:
 
-$$\hat{T}_m = f_{\theta_m}(\mathbf{C}), \quad m = 1, \ldots, M \tag{3.10}$$
+$$
+\hat{T}_m = f_{\theta_m}(\mathbf{C}), \quad m = 1, \ldots, M \tag{3.10}
+$$
 
 where $\theta_m$ denotes the parameters obtained by training from initialization $\theta_m^{(0)} \sim p(\theta; s_m)$.
 
 **Prediction statistics.** At inference, the ensemble provides a point estimate and uncertainty:
 
-$$\bar{T}(x,y) = \frac{1}{M} \sum_{m=1}^{M} \hat{T}_m(x,y) \tag{3.11}$$
+$$
+\bar{T}(x,y) = \frac{1}{M} \sum_{m=1}^{M} \hat{T}_m(x,y) \tag{3.11}
+$$
 
-$$\sigma_T(x,y) = \left(\frac{1}{M-1} \sum_{m=1}^{M} (\hat{T}_m(x,y) - \bar{T}(x,y))^2\right)^{1/2} \tag{3.12}$$
+$$
+\sigma_T(x,y) = \left(\frac{1}{M-1} \sum_{m=1}^{M} (\hat{T}_m(x,y) - \bar{T}(x,y))^2\right)^{1/2} \tag{3.12}
+$$
 
 **What the ensemble captures.** [Assumption: ensemble variance approximates epistemic uncertainty.] The variance (3.12) reflects disagreement among models that found different solutions due to different initialization and SGD trajectories. Fort, Hu & Lakshminarayanan (2019) showed that this diversity arises because different random initializations explore distinct basins in function space, not merely different weight-space solutions. This captures *epistemic* uncertainty — uncertainty due to finite training data and model capacity — but not *aleatoric* uncertainty arising from the observation noise itself. Ovadia et al. (2019) demonstrated empirically that deep ensembles performed among the strongest UQ methods under dataset shift across their benchmark suite, outperforming MC-Dropout, variational inference, and other approximate Bayesian methods on most tasks.
 
@@ -324,25 +382,33 @@ This section derives the theoretical foundation of DDPM and its connection to sc
 
 **Definition.** [Exact; Ho et al. (2020).] Given a clean data sample $\mathbf{x}_0 \sim q(\mathbf{x}_0)$, the forward process defines a Markov chain of increasingly noisy versions:
 
-$$q(\mathbf{x}_t | \mathbf{x}_{t-1}) = \mathcal{N}(\mathbf{x}_t; \sqrt{1 - \beta_t}\,\mathbf{x}_{t-1},\; \beta_t \mathbf{I}) \tag{4.1}$$
+$$
+q(\mathbf{x}_t | \mathbf{x}_{t-1}) = \mathcal{N}(\mathbf{x}_t; \sqrt{1 - \beta_t}\,\mathbf{x}_{t-1},\; \beta_t \mathbf{I}) \tag{4.1}
+$$
 
 for $t = 1, \ldots, T$ with a noise schedule $\beta_1, \ldots, \beta_T \in (0,1)$.
 
 **Closed-form marginal.** [Exact.] By iterating (4.1), the marginal at any step $t$ is:
 
-$$q(\mathbf{x}_t | \mathbf{x}_0) = \mathcal{N}(\mathbf{x}_t; \sqrt{\bar{\alpha}_t}\,\mathbf{x}_0,\; (1 - \bar{\alpha}_t)\mathbf{I}) \tag{4.2}$$
+$$
+q(\mathbf{x}_t | \mathbf{x}_0) = \mathcal{N}(\mathbf{x}_t; \sqrt{\bar{\alpha}_t}\,\mathbf{x}_0,\; (1 - \bar{\alpha}_t)\mathbf{I}) \tag{4.2}
+$$
 
 where $\alpha_t = 1 - \beta_t$ and $\bar{\alpha}_t = \prod_{s=1}^{t} \alpha_s$.
 
 **[Derivation of (4.2) from (4.1).]** At $t=1$: $\mathbf{x}_1 = \sqrt{\alpha_1}\,\mathbf{x}_0 + \sqrt{1-\alpha_1}\,\boldsymbol{\epsilon}_1$, with $\boldsymbol{\epsilon}_1 \sim \mathcal{N}(0, \mathbf{I})$. At $t=2$:
 
-$$\mathbf{x}_2 = \sqrt{\alpha_2}\,\mathbf{x}_1 + \sqrt{1-\alpha_2}\,\boldsymbol{\epsilon}_2 = \sqrt{\alpha_2 \alpha_1}\,\mathbf{x}_0 + \sqrt{\alpha_2(1-\alpha_1)}\,\boldsymbol{\epsilon}_1 + \sqrt{1-\alpha_2}\,\boldsymbol{\epsilon}_2 \tag{4.3}$$
+$$
+\mathbf{x}_2 = \sqrt{\alpha_2}\,\mathbf{x}_1 + \sqrt{1-\alpha_2}\,\boldsymbol{\epsilon}_2 = \sqrt{\alpha_2 \alpha_1}\,\mathbf{x}_0 + \sqrt{\alpha_2(1-\alpha_1)}\,\boldsymbol{\epsilon}_1 + \sqrt{1-\alpha_2}\,\boldsymbol{\epsilon}_2 \tag{4.3}
+$$
 
 The sum of two independent Gaussians with variances $\alpha_2(1-\alpha_1)$ and $(1-\alpha_2)$ gives total variance $\alpha_2 - \alpha_2\alpha_1 + 1 - \alpha_2 = 1 - \alpha_1\alpha_2 = 1 - \bar{\alpha}_2$. By induction, (4.2) holds for all $t$. $\square$
 
 **The reparameterization.** Equation (4.2) gives a direct sampling formula:
 
-$$\mathbf{x}_t = \sqrt{\bar{\alpha}_t}\,\mathbf{x}_0 + \sqrt{1 - \bar{\alpha}_t}\,\boldsymbol{\epsilon}, \quad \boldsymbol{\epsilon} \sim \mathcal{N}(0, \mathbf{I}) \tag{4.4}$$
+$$
+\mathbf{x}_t = \sqrt{\bar{\alpha}_t}\,\mathbf{x}_0 + \sqrt{1 - \bar{\alpha}_t}\,\boldsymbol{\epsilon}, \quad \boldsymbol{\epsilon} \sim \mathcal{N}(0, \mathbf{I}) \tag{4.4}
+$$
 
 This is what the training loop uses: sample $t$ uniformly, sample $\boldsymbol{\epsilon}$, compute $\mathbf{x}_t$ via (4.4), and train the network to predict $\boldsymbol{\epsilon}$.
 
@@ -352,11 +418,15 @@ This is what the training loop uses: sample $t$ uniformly, sample $\boldsymbol{\
 
 **The reverse diffusion SDE.** [Following Song et al. (2021).] The continuous-time limit of the forward process (4.1) is the SDE:
 
-$$d\mathbf{x} = -\frac{1}{2}\beta(t)\,\mathbf{x}\,dt + \sqrt{\beta(t)}\,d\mathbf{w} \tag{4.5}$$
+$$
+d\mathbf{x} = -\frac{1}{2}\beta(t)\,\mathbf{x}\,dt + \sqrt{\beta(t)}\,d\mathbf{w} \tag{4.5}
+$$
 
 where $\mathbf{w}$ is a standard Wiener process. Anderson (1982) showed that the time-reversal of this SDE is:
 
-$$d\mathbf{x} = \left[-\frac{1}{2}\beta(t)\,\mathbf{x} - \beta(t)\,\nabla_{\mathbf{x}} \log p_t(\mathbf{x})\right] dt + \sqrt{\beta(t)}\,d\bar{\mathbf{w}} \tag{4.6}$$
+$$
+d\mathbf{x} = \left[-\frac{1}{2}\beta(t)\,\mathbf{x} - \beta(t)\,\nabla_{\mathbf{x}} \log p_t(\mathbf{x})\right] dt + \sqrt{\beta(t)}\,d\bar{\mathbf{w}} \tag{4.6}
+$$
 
 where $\bar{\mathbf{w}}$ is a reverse-time Wiener process and $\nabla_{\mathbf{x}} \log p_t(\mathbf{x})$ is the **score function** — the gradient of the log-density of the noisy data distribution at time $t$.
 
@@ -368,17 +438,23 @@ where $\bar{\mathbf{w}}$ is a reverse-time Wiener process and $\nabla_{\mathbf{x
 
 **DDPM training objective.** [Exact; Ho et al. (2020), Eq. 14.] Rather than estimating the score directly, DDPM trains a network $\boldsymbol{\epsilon}_\phi(\mathbf{x}_t, t)$ to predict the noise $\boldsymbol{\epsilon}$ added at step $t$:
 
-$$\mathcal{L}_{\text{DDPM}} = \mathbb{E}_{t, \mathbf{x}_0, \boldsymbol{\epsilon}}\!\left[\|\boldsymbol{\epsilon} - \boldsymbol{\epsilon}_\phi(\mathbf{x}_t, t)\|^2\right] \tag{4.7}$$
+$$
+\mathcal{L}_{\text{DDPM}} = \mathbb{E}_{t, \mathbf{x}_0, \boldsymbol{\epsilon}}\!\left[\|\boldsymbol{\epsilon} - \boldsymbol{\epsilon}_\phi(\mathbf{x}_t, t)\|^2\right] \tag{4.7}
+$$
 
 where $t \sim \text{Uniform}\{1, \ldots, T\}$, $\mathbf{x}_0 \sim q(\mathbf{x}_0)$, $\boldsymbol{\epsilon} \sim \mathcal{N}(0, \mathbf{I})$, and $\mathbf{x}_t$ is computed via (4.4).
 
 **Equivalence to score matching.** From (4.2), the conditional score is [Exact]:
 
-$$\nabla_{\mathbf{x}_t} \log q(\mathbf{x}_t | \mathbf{x}_0) = -\frac{\mathbf{x}_t - \sqrt{\bar{\alpha}_t}\,\mathbf{x}_0}{1 - \bar{\alpha}_t} = -\frac{\boldsymbol{\epsilon}}{\sqrt{1 - \bar{\alpha}_t}} \tag{4.8}$$
+$$
+\nabla_{\mathbf{x}_t} \log q(\mathbf{x}_t | \mathbf{x}_0) = -\frac{\mathbf{x}_t - \sqrt{\bar{\alpha}_t}\,\mathbf{x}_0}{1 - \bar{\alpha}_t} = -\frac{\boldsymbol{\epsilon}}{\sqrt{1 - \bar{\alpha}_t}} \tag{4.8}
+$$
 
 Therefore, predicting $\boldsymbol{\epsilon}$ is equivalent to estimating the score up to a known scaling factor [Approximation: the network $\boldsymbol{\epsilon}_\phi$ approximates the *marginal* score $\nabla \log p_t(\mathbf{x}_t)$, not the conditional score $\nabla \log q(\mathbf{x}_t | \mathbf{x}_0)$ which requires knowing $\mathbf{x}_0$]:
 
-$$\nabla_{\mathbf{x}_t} \log p_t(\mathbf{x}_t) \approx -\frac{\boldsymbol{\epsilon}_\phi(\mathbf{x}_t, t)}{\sqrt{1 - \bar{\alpha}_t}} \tag{4.9}$$
+$$
+\nabla_{\mathbf{x}_t} \log p_t(\mathbf{x}_t) \approx -\frac{\boldsymbol{\epsilon}_\phi(\mathbf{x}_t, t)}{\sqrt{1 - \bar{\alpha}_t}} \tag{4.9}
+$$
 
 The DDPM loss (4.7) is a reweighted version of the denoising score matching objective of Vincent (2011). The DDPM ELBO decomposes into per-timestep KL terms, each of which equals a weighted denoising score matching loss (Ho et al., 2020, Eq. 12); predicting $\boldsymbol{\epsilon}$ is equivalent to estimating $-\sqrt{1-\bar{\alpha}_t}\,\nabla_{\mathbf{x}}\log q_t(\mathbf{x})$ via Tweedie's formula. The $L_{\text{simple}}$ objective (4.7) drops the ELBO-derived timestep-dependent weights $\beta_t^2 / (2\sigma_t^2 \alpha_t (1-\bar{\alpha}_t))$ in favor of uniform weighting over $t$. This is an intentional design choice: Nichol & Dhariwal (2021) confirmed that uniform weighting produces better sample quality than the ELBO-derived weights. The term "reweighted" refers specifically to this replacement, not to an approximation error.
 
@@ -386,7 +462,9 @@ The DDPM loss (4.7) is a reweighted version of the denoising score matching obje
 
 **Conditioning mechanism.** In our setting, the DDPM generates solution fields $T$ conditioned on boundary observations $\mathbf{C}$. The network receives the 8-channel conditioning tensor concatenated with the noisy field:
 
-$$\boldsymbol{\epsilon}_\phi(\mathbf{x}_t, \mathbf{C}, t): \mathbb{R}^{9 \times 64 \times 64} \times \{1,\ldots,T\} \to \mathbb{R}^{1 \times 64 \times 64} \tag{4.10}$$
+$$
+\boldsymbol{\epsilon}_\phi(\mathbf{x}_t, \mathbf{C}, t): \mathbb{R}^{9 \times 64 \times 64} \times \{1,\ldots,T\} \to \mathbb{R}^{1 \times 64 \times 64} \tag{4.10}
+$$
 
 The 9 input channels are: 1 channel for $\mathbf{x}_t$ (the noisy field) and 8 channels for $\mathbf{C}$ (the conditioning tensor from §2.5). The timestep $t$ is injected via sinusoidal positional encoding (Vaswani et al., 2017) into the ResBlocks.
 
@@ -398,33 +476,45 @@ The 9 input channels are: 1 channel for $\mathbf{x}_t$ (the noisy field) and 8 c
 
 **DDPM sampling.** [Exact; Ho et al. (2020), Algorithm 2.] Starting from $\mathbf{x}_T \sim \mathcal{N}(0, \mathbf{I})$, the reverse process iterates:
 
-$$\mathbf{x}_{t-1} = \frac{1}{\sqrt{\alpha_t}}\left(\mathbf{x}_t - \frac{\beta_t}{\sqrt{1 - \bar{\alpha}_t}}\,\boldsymbol{\epsilon}_\phi(\mathbf{x}_t, \mathbf{C}, t)\right) + \sigma_t \mathbf{z} \tag{4.11}$$
+$$
+\mathbf{x}_{t-1} = \frac{1}{\sqrt{\alpha_t}}\left(\mathbf{x}_t - \frac{\beta_t}{\sqrt{1 - \bar{\alpha}_t}}\,\boldsymbol{\epsilon}_\phi(\mathbf{x}_t, \mathbf{C}, t)\right) + \sigma_t \mathbf{z} \tag{4.11}
+$$
 
 where $\mathbf{z} \sim \mathcal{N}(0, \mathbf{I})$ for $t > 1$ and $\mathbf{z} = 0$ for $t = 1$, and $\sigma_t = \sqrt{\beta_t}$.
 
 **Derivation of (4.11).** [Exact.] The reverse posterior $q(\mathbf{x}_{t-1} | \mathbf{x}_t, \mathbf{x}_0)$ is Gaussian with mean:
 
-$$\tilde{\mu}_t = \frac{\sqrt{\bar{\alpha}_{t-1}}\,\beta_t}{1 - \bar{\alpha}_t}\,\mathbf{x}_0 + \frac{\sqrt{\alpha_t}(1 - \bar{\alpha}_{t-1})}{1 - \bar{\alpha}_t}\,\mathbf{x}_t \tag{4.12}$$
+$$
+\tilde{\mu}_t = \frac{\sqrt{\bar{\alpha}_{t-1}}\,\beta_t}{1 - \bar{\alpha}_t}\,\mathbf{x}_0 + \frac{\sqrt{\alpha_t}(1 - \bar{\alpha}_{t-1})}{1 - \bar{\alpha}_t}\,\mathbf{x}_t \tag{4.12}
+$$
 
 Substituting $\mathbf{x}_0 = (\mathbf{x}_t - \sqrt{1 - \bar{\alpha}_t}\,\boldsymbol{\epsilon}) / \sqrt{\bar{\alpha}_t}$ from (4.4) into (4.12):
 
-$$\tilde{\mu}_t = \frac{\sqrt{\bar{\alpha}_{t-1}}\,\beta_t}{1 - \bar{\alpha}_t} \cdot \frac{\mathbf{x}_t - \sqrt{1 - \bar{\alpha}_t}\,\boldsymbol{\epsilon}}{\sqrt{\bar{\alpha}_t}} + \frac{\sqrt{\alpha_t}(1 - \bar{\alpha}_{t-1})}{1 - \bar{\alpha}_t}\,\mathbf{x}_t \tag{4.12a}$$
+$$
+\tilde{\mu}_t = \frac{\sqrt{\bar{\alpha}_{t-1}}\,\beta_t}{1 - \bar{\alpha}_t} \cdot \frac{\mathbf{x}_t - \sqrt{1 - \bar{\alpha}_t}\,\boldsymbol{\epsilon}}{\sqrt{\bar{\alpha}_t}} + \frac{\sqrt{\alpha_t}(1 - \bar{\alpha}_{t-1})}{1 - \bar{\alpha}_t}\,\mathbf{x}_t \tag{4.12a}
+$$
 
 Collecting the coefficient of $\mathbf{x}_t$:
 
-$$\frac{\sqrt{\bar{\alpha}_{t-1}}\,\beta_t}{(1 - \bar{\alpha}_t)\sqrt{\bar{\alpha}_t}} + \frac{\sqrt{\alpha_t}(1 - \bar{\alpha}_{t-1})}{1 - \bar{\alpha}_t} = \frac{\beta_t + \alpha_t(1 - \bar{\alpha}_{t-1})}{(1 - \bar{\alpha}_t)\sqrt{\alpha_t}} = \frac{1}{\sqrt{\alpha_t}} \tag{4.12b}$$
+$$
+\frac{\sqrt{\bar{\alpha}_{t-1}}\,\beta_t}{(1 - \bar{\alpha}_t)\sqrt{\bar{\alpha}_t}} + \frac{\sqrt{\alpha_t}(1 - \bar{\alpha}_{t-1})}{1 - \bar{\alpha}_t} = \frac{\beta_t + \alpha_t(1 - \bar{\alpha}_{t-1})}{(1 - \bar{\alpha}_t)\sqrt{\alpha_t}} = \frac{1}{\sqrt{\alpha_t}} \tag{4.12b}
+$$
 
 where we used $\bar{\alpha}_t = \alpha_t \bar{\alpha}_{t-1}$ and $\beta_t + \alpha_t - \alpha_t\bar{\alpha}_{t-1} = 1 - \bar{\alpha}_t$. The coefficient of $\boldsymbol{\epsilon}$ simplifies to $-\beta_t / (\sqrt{\alpha_t}\sqrt{1 - \bar{\alpha}_t})$. Replacing $\boldsymbol{\epsilon}$ with the network prediction $\boldsymbol{\epsilon}_\phi$ yields (4.11).
 
 **Denoised estimate.** At any step $t$, the network's prediction implicitly estimates the clean data:
 
-$$\hat{\mathbf{x}}_0^{(t)} = \frac{\mathbf{x}_t - \sqrt{1 - \bar{\alpha}_t}\,\boldsymbol{\epsilon}_\phi(\mathbf{x}_t, \mathbf{C}, t)}{\sqrt{\bar{\alpha}_t}} \tag{4.13}$$
+$$
+\hat{\mathbf{x}}_0^{(t)} = \frac{\mathbf{x}_t - \sqrt{1 - \bar{\alpha}_t}\,\boldsymbol{\epsilon}_\phi(\mathbf{x}_t, \mathbf{C}, t)}{\sqrt{\bar{\alpha}_t}} \tag{4.13}
+$$
 
 This denoised estimate is used in the physics regularization (§6). At large $t$, the estimate is noisy and unreliable. At small $t$ (say $t < T/4$), the estimate is accurate enough to evaluate the PDE residual.
 
 **EMA.** An exponential moving average of the model weights (Polyak & Juditsky, 1992; Tarvainen & Valpola, 2017) is maintained during training with decay $\gamma = 0.999$:
 
-$$\bar{\theta}_{k+1} = \gamma \bar{\theta}_k + (1-\gamma) \theta_k \tag{4.14}$$
+$$
+\bar{\theta}_{k+1} = \gamma \bar{\theta}_k + (1-\gamma) \theta_k \tag{4.14}
+$$
 
 The EMA weights $\bar{\theta}$ are used at inference. This stabilizes sample quality without affecting the training dynamics.
 
@@ -438,17 +528,23 @@ The EMA weights $\bar{\theta}$ are used at inference. This stabilizes sample qua
 
 In Phase 2, the model does not observe the exact boundary profile $g$. Instead, it receives $M$ noisy point observations per edge:
 
-$$\tilde{g}_i = g(x_i) + \epsilon_i, \quad \epsilon_i \sim \mathcal{N}(0, \sigma_{\text{obs}}^2), \quad i = 1, \ldots, M \tag{5.1}$$
+$$
+\tilde{g}_i = g(x_i) + \epsilon_i, \quad \epsilon_i \sim \mathcal{N}(0, \sigma_{\text{obs}}^2), \quad i = 1, \ldots, M \tag{5.1}
+$$
 
 at positions $x_1, \ldots, x_M$ sampled on the edge. More compactly, defining the **observation operator** $\mathcal{H}: T \mapsto (g(x_1), \ldots, g(x_M))$ as the boundary trace sampled at the $M$ observation points:
 
-$$\tilde{\mathbf{g}} = \mathcal{H}(T) + \boldsymbol{\varepsilon}, \quad \boldsymbol{\varepsilon} \sim \mathcal{N}(\mathbf{0}, \sigma_{\text{obs}}^2 \mathbf{I}_M) \tag{5.1a}$$
+$$
+\tilde{\mathbf{g}} = \mathcal{H}(T) + \boldsymbol{\varepsilon}, \quad \boldsymbol{\varepsilon} \sim \mathcal{N}(\mathbf{0}, \sigma_{\text{obs}}^2 \mathbf{I}_M) \tag{5.1a}
+$$
 
 The operator $\mathcal{H}$ composes the boundary trace (extracting $g$ from $T$) with subsampling at the observation positions. The remaining boundary values are reconstructed by linear interpolation between observed points, and the 8-channel mask (§2.5) encodes which positions are directly observed.
 
 **What is uncertain.** Given sparse noisy observations, the full boundary profile $g$ is unknown. Different boundary completions consistent with (5.1) lead to different PDE solutions. The **posterior** is the distribution over temperature fields $T$ consistent with the observations:
 
-$$p(T | \tilde{\mathbf{g}}) \propto p(\tilde{\mathbf{g}} | T) \cdot p(T) \tag{5.2}$$
+$$
+p(T | \tilde{\mathbf{g}}) \propto p(\tilde{\mathbf{g}} | T) \cdot p(T) \tag{5.2}
+$$
 
 where $p(T)$ is the prior over solution fields induced by the BC generation process (§2.4), and $p(\tilde{\mathbf{g}} | T) = \mathcal{N}(\tilde{\mathbf{g}}; \mathcal{H}(T), \sigma_{\text{obs}}^2 \mathbf{I}_M)$ is the Gaussian likelihood from (5.1a).
 
@@ -462,7 +558,9 @@ This distinction matters. If the boundary prior were different (e.g., drawn from
 
 When trained on the joint distribution of (observations, solutions), the conditional DDPM learns:
 
-$$\mathbf{x}_0^{(k)} \sim p_\phi(\mathbf{x}_0 | \mathbf{C}) \approx p(T | \tilde{\mathbf{g}}), \quad k = 1, \ldots, K \tag{5.3}$$
+$$
+\mathbf{x}_0^{(k)} \sim p_\phi(\mathbf{x}_0 | \mathbf{C}) \approx p(T | \tilde{\mathbf{g}}), \quad k = 1, \ldots, K \tag{5.3}
+$$
 
 Drawing $K$ independent samples (each from a different noise initialization $\mathbf{x}_T^{(k)} \sim \mathcal{N}(0, \mathbf{I})$) produces an empirical posterior. The sample diversity reflects the model's learned uncertainty: samples should vary in regions where the observations are sparse or noisy, and agree in regions well-constrained by the data.
 
@@ -476,7 +574,9 @@ Whether this theoretical advantage translates to measurably better calibration a
 
 **[Design choice.]** Rather than training separate models for each observation regime, a single Phase 2 model handles variable observation quality by randomizing the observation parameters during training:
 
-$$M \sim \text{Uniform}\{8, 12, 16, 24, 32, 48, 64\}, \quad \sigma_{\text{obs}} \sim \text{Uniform}(0, 0.2) \tag{5.4}$$
+$$
+M \sim \text{Uniform}\{8, 12, 16, 24, 32, 48, 64\}, \quad \sigma_{\text{obs}} \sim \text{Uniform}(0, 0.2) \tag{5.4}
+$$
 
 Each training sample gets a fresh draw of $(M, \sigma_{\text{obs}})$. The mask channels in the conditioning tensor (§2.5) communicate the observation quality to the model. At evaluation, fixed regimes are used (Table 5 in the implementation plan).
 
@@ -500,17 +600,23 @@ The standard DDPM objective (4.7) is purely data-driven — it matches the score
 
 At each training step, we compute the denoised estimate (4.13) and evaluate the discrete Laplacian residual on the interior grid:
 
-$$r_{i,j} = \hat{T}_{i+1,j} + \hat{T}_{i-1,j} + \hat{T}_{i,j+1} + \hat{T}_{i,j-1} - 4\hat{T}_{i,j}, \quad 1 \leq i,j \leq N-3 \tag{6.1}$$
+$$
+r_{i,j} = \hat{T}_{i+1,j} + \hat{T}_{i-1,j} + \hat{T}_{i,j+1} + \hat{T}_{i,j-1} - 4\hat{T}_{i,j}, \quad 1 \leq i,j \leq N-3 \tag{6.1}
+$$
 
 where $\hat{T} = \hat{\mathbf{x}}_0^{(t)}$ from (4.13). The residual field $r$ has shape $(N-2) \times (N-2) = (62, 62)$ for $N=64$.
 
 **The per-sample physics loss:**
 
-$$\mathcal{L}_{\text{phys}} = \frac{\sum_{b=1}^{B} w_b \cdot \frac{1}{62^2}\sum_{i,j} r_{i,j}^{(b)\,2}}{\sum_{b=1}^{B} w_b + 10^{-8}} \tag{6.2}$$
+$$
+\mathcal{L}_{\text{phys}} = \frac{\sum_{b=1}^{B} w_b \cdot \frac{1}{62^2}\sum_{i,j} r_{i,j}^{(b)\,2}}{\sum_{b=1}^{B} w_b + 10^{-8}} \tag{6.2}
+$$
 
 where $B$ is the batch size, $r^{(b)}$ is the residual for the $b$-th sample, and the per-sample weight is:
 
-$$w_b = \mathbb{1}[t_b < T/4] \tag{6.3}$$
+$$
+w_b = \mathbb{1}[t_b < T/4] \tag{6.3}
+$$
 
 ### 6.3 Why Per-Sample Weighting
 
@@ -522,11 +628,15 @@ Per-sample weighting (6.3) ensures that approximately $25\%$ of samples per batc
 
 ### 6.4 Combined Objective
 
-$$\mathcal{L} = \mathcal{L}_{\text{DDPM}} + \lambda(e) \cdot \mathcal{L}_{\text{phys}} \tag{6.4}$$
+$$
+\mathcal{L} = \mathcal{L}_{\text{DDPM}} + \lambda(e) \cdot \mathcal{L}_{\text{phys}} \tag{6.4}
+$$
 
 with a warmup schedule:
 
-$$\lambda(e) = \begin{cases} 0 & e < e_{\text{warm}} \\ \lambda_{\max} \cdot \frac{e - e_{\text{warm}}}{e_{\text{ramp}}} & e_{\text{warm}} \leq e < e_{\text{warm}} + e_{\text{ramp}} \\ \lambda_{\max} & e \geq e_{\text{warm}} + e_{\text{ramp}} \end{cases} \tag{6.5}$$
+$$
+\lambda(e) = \begin{cases} 0 & e < e_{\text{warm}} \\ \lambda_{\max} \cdot \frac{e - e_{\text{warm}}}{e_{\text{ramp}}} & e_{\text{warm}} \leq e < e_{\text{warm}} + e_{\text{ramp}} \\ \lambda_{\max} & e \geq e_{\text{warm}} + e_{\text{ramp}} \end{cases} \tag{6.5}
+$$
 
 with $e_{\text{warm}} = 20$, $e_{\text{ramp}} = 20$, $\lambda_{\max} = 0.1$. The warmup period lets the DDPM learn basic denoising before physics regularization is applied.
 
@@ -544,15 +654,21 @@ This section derives the flow matching framework as an alternative to DDPM. Wher
 
 **Continuous normalizing flows.** A continuous normalizing flow (CNF) defines a time-dependent velocity field $v_t: \mathbb{R}^d \to \mathbb{R}^d$ that generates a probability path $p_t$ from a source distribution $p_0 = \mathcal{N}(0, \mathbf{I})$ to the data distribution $p_1 \approx q(\mathbf{x})$ via the ODE:
 
-$$\frac{d\mathbf{x}}{dt} = v_t(\mathbf{x}) \tag{7.1}$$
+$$
+\frac{d\mathbf{x}}{dt} = v_t(\mathbf{x}) \tag{7.1}
+$$
 
 The flow matching (FM) objective (Lipman et al., 2023, Eq. 5) regresses a parametric velocity field $v_\theta$ against the true generating velocity $u_t$:
 
-$$\mathcal{L}_{\text{FM}}(\theta) = \mathbb{E}_{t \sim U(0,1),\, \mathbf{x} \sim p_t} \|v_\theta(\mathbf{x}, t) - u_t(\mathbf{x})\|^2 \tag{7.2}$$
+$$
+\mathcal{L}_{\text{FM}}(\theta) = \mathbb{E}_{t \sim U(0,1),\, \mathbf{x} \sim p_t} \|v_\theta(\mathbf{x}, t) - u_t(\mathbf{x})\|^2 \tag{7.2}
+$$
 
 Computing $p_t(\mathbf{x})$ directly is intractable. The key insight is **conditional flow matching** (CFM): condition on a single data point $\mathbf{x}_1$ and define a tractable conditional probability path $p_t(\mathbf{x} | \mathbf{x}_1)$ with conditional velocity $u_t(\mathbf{x} | \mathbf{x}_1)$. Lipman et al. (2023, Theorem 2) prove that the CFM loss
 
-$$\mathcal{L}_{\text{CFM}}(\theta) = \mathbb{E}_{t,\, q(\mathbf{x}_1),\, p_t(\mathbf{x}|\mathbf{x}_1)} \|v_\theta(\mathbf{x}, t) - u_t(\mathbf{x} | \mathbf{x}_1)\|^2 \tag{7.3}$$
+$$
+\mathcal{L}_{\text{CFM}}(\theta) = \mathbb{E}_{t,\, q(\mathbf{x}_1),\, p_t(\mathbf{x}|\mathbf{x}_1)} \|v_\theta(\mathbf{x}, t) - u_t(\mathbf{x} | \mathbf{x}_1)\|^2 \tag{7.3}
+$$
 
 has identical gradients to (7.2): $\nabla_\theta \mathcal{L}_{\text{FM}} = \nabla_\theta \mathcal{L}_{\text{CFM}}$.
 
@@ -560,15 +676,21 @@ has identical gradients to (7.2): $\nabla_\theta \mathcal{L}_{\text{FM}} = \nabl
 
 **Gaussian conditional path.** Following Lipman et al. (2023, Eqs. 10, 20), the OT-conditional probability path is:
 
-$$p_t(\mathbf{x} | \mathbf{x}_1) = \mathcal{N}\!\left(\mathbf{x};\; t\,\mathbf{x}_1,\; (1 - (1-\sigma_{\min})t)^2 \mathbf{I}\right) \tag{7.4}$$
+$$
+p_t(\mathbf{x} | \mathbf{x}_1) = \mathcal{N}\!\left(\mathbf{x};\; t\,\mathbf{x}_1,\; (1 - (1-\sigma_{\min})t)^2 \mathbf{I}\right) \tag{7.4}
+$$
 
 As $\sigma_{\min} \to 0$, this produces the **linear interpolant**:
 
-$$\mathbf{x}_t = (1-t)\,\mathbf{x}_0 + t\,\mathbf{x}_1, \quad \mathbf{x}_0 \sim \mathcal{N}(0, \mathbf{I}),\; \mathbf{x}_1 \sim q(\mathbf{x}) \tag{7.5}$$
+$$
+\mathbf{x}_t = (1-t)\,\mathbf{x}_0 + t\,\mathbf{x}_1, \quad \mathbf{x}_0 \sim \mathcal{N}(0, \mathbf{I}),\; \mathbf{x}_1 \sim q(\mathbf{x}) \tag{7.5}
+$$
 
 The conditional velocity field (Lipman et al., 2023, Eq. 21) simplifies to:
 
-$$u_t(\mathbf{x} | \mathbf{x}_1) = \mathbf{x}_1 - \mathbf{x}_0 \tag{7.6}$$
+$$
+u_t(\mathbf{x} | \mathbf{x}_1) = \mathbf{x}_1 - \mathbf{x}_0 \tag{7.6}
+$$
 
 This velocity is **constant along each conditional path** — independent of $t$. Contrast with DDPM, where the noise target $\boldsymbol{\epsilon}$ enters the loss with timestep-dependent weighting through the schedule $\bar{\alpha}_t$. The constant velocity makes flow matching targets lower-variance and easier to learn.
 
@@ -582,7 +704,9 @@ This velocity is **constant along each conditional path** — independent of $t$
 
 **Standard CFM** pairs noise $\mathbf{x}_0^{(i)}$ with data $\mathbf{x}_1^{(i)}$ by batch index — the coupling is arbitrary. **OT-CFM** (Tong et al., TMLR 2024) replaces this random coupling with a mini-batch optimal transport plan $\pi(\mathbf{x}_0, \mathbf{x}_1)$, minimizing the total transport cost within each batch:
 
-$$\pi^* = \arg\min_{\pi \in \Pi(\hat{p}_0, \hat{p}_1)} \sum_{i,j} \pi_{ij} \|\mathbf{x}_0^{(i)} - \mathbf{x}_1^{(j)}\|^2 \tag{7.7}$$
+$$
+\pi^* = \arg\min_{\pi \in \Pi(\hat{p}_0, \hat{p}_1)} \sum_{i,j} \pi_{ij} \|\mathbf{x}_0^{(i)} - \mathbf{x}_1^{(j)}\|^2 \tag{7.7}
+$$
 
 where $\hat{p}_0, \hat{p}_1$ are the empirical distributions of the noise and data batches, and $\Pi$ is the set of doubly stochastic coupling matrices. For mini-batches of size $B$, this is solved exactly via the Hungarian algorithm (`scipy.optimize.linear_sum_assignment`) in $O(B^3)$ — negligible overhead for $B = 64$ on 4096-dimensional data.
 
@@ -598,7 +722,9 @@ where $\hat{p}_0, \hat{p}_1$ are the empirical distributions of the noise and da
 
 The Benamou-Brenier (2000) dynamic formulation of optimal transport expresses the Wasserstein-2 distance as a variational problem:
 
-$$W_2^2(\mu_0, \mu_1) = \inf_{\rho, v} \int_0^1 \!\!\int_{\mathbb{R}^d} \|v(\mathbf{x}, t)\|^2 \,\rho(\mathbf{x}, t)\,d\mathbf{x}\,dt \tag{7.8}$$
+$$
+W_2^2(\mu_0, \mu_1) = \inf_{\rho, v} \int_0^1 \!\!\int_{\mathbb{R}^d} \|v(\mathbf{x}, t)\|^2 \,\rho(\mathbf{x}, t)\,d\mathbf{x}\,dt \tag{7.8}
+$$
 
 subject to the continuity equation $\partial_t \rho + \nabla \cdot (\rho\, v) = 0$ with boundary conditions $\rho(0) = \mu_0$, $\rho(1) = \mu_1$.
 
@@ -636,7 +762,9 @@ This section documents three modifications to the standard DDPM training pipelin
 
 **Cosine schedule** (Nichol & Dhariwal, ICML 2021, Eq. 16):
 
-$$\bar{\alpha}_t = \frac{f(t)}{f(0)}, \quad f(t) = \cos^2\!\left(\frac{t/T + s}{1 + s} \cdot \frac{\pi}{2}\right) \tag{8.1}$$
+$$
+\bar{\alpha}_t = \frac{f(t)}{f(0)}, \quad f(t) = \cos^2\!\left(\frac{t/T + s}{1 + s} \cdot \frac{\pi}{2}\right) \tag{8.1}
+$$
 
 with $s = 0.008$ chosen so that $\sqrt{\beta_0}$ is slightly smaller than the pixel bin size $1/127.5$. The betas are $\beta_t = 1 - \bar{\alpha}_t / \bar{\alpha}_{t-1}$, clipped to at most 0.999.
 
@@ -652,7 +780,9 @@ with $s = 0.008$ chosen so that $\sqrt{\beta_0}$ is slightly smaller than the pi
 
 **Definition** (Salimans & Ho, ICLR 2022, §4). Instead of predicting noise $\boldsymbol{\epsilon}$, the network predicts:
 
-$$v_t = \sqrt{\bar{\alpha}_t} \cdot \boldsymbol{\epsilon} - \sqrt{1 - \bar{\alpha}_t} \cdot \mathbf{x}_0 \tag{8.2}$$
+$$
+v_t = \sqrt{\bar{\alpha}_t} \cdot \boldsymbol{\epsilon} - \sqrt{1 - \bar{\alpha}_t} \cdot \mathbf{x}_0 \tag{8.2}
+$$
 
 **Why v-prediction is more stable.** With $\epsilon$-prediction, recovering $\mathbf{x}_0$ requires $\hat{\mathbf{x}}_0 = (\mathbf{x}_t - \sqrt{1-\bar{\alpha}_t}\,\hat{\boldsymbol{\epsilon}}) / \sqrt{\bar{\alpha}_t}$, which divides by $\sqrt{\bar{\alpha}_t} \to 0$ at high noise — amplifying prediction errors. v-prediction avoids this: $\hat{\mathbf{x}}_0 = \sqrt{\bar{\alpha}_t}\,\mathbf{x}_t - \sqrt{1-\bar{\alpha}_t}\,\hat{v}_t$, which remains well-conditioned across all timesteps. The v-prediction loss yields an effective weighting of $1 + \text{SNR}(t)$, which assigns nonzero weight even at $\text{SNR} = 0$ — unlike $\epsilon$-prediction whose weight vanishes there.
 
@@ -662,11 +792,15 @@ $$v_t = \sqrt{\bar{\alpha}_t} \cdot \boldsymbol{\epsilon} - \sqrt{1 - \bar{\alph
 
 **Min-SNR-$\gamma_{\text{SNR}}$** (Hang et al., ICCV 2023, §3.4) clips the signal-to-noise ratio to reduce the contribution of high-noise timesteps (we write $\gamma_{\text{SNR}}$ to distinguish from the EMA decay $\gamma$ in §4.5):
 
-$$\text{SNR}(t) = \frac{\bar{\alpha}_t}{1 - \bar{\alpha}_t}, \quad w(t) = \frac{\min(\text{SNR}(t),\; \gamma_{\text{SNR}})}{\text{SNR}(t)} \tag{8.3}$$
+$$
+\text{SNR}(t) = \frac{\bar{\alpha}_t}{1 - \bar{\alpha}_t}, \quad w(t) = \frac{\min(\text{SNR}(t),\; \gamma_{\text{SNR}})}{\text{SNR}(t)} \tag{8.3}
+$$
 
 With $\gamma_{\text{SNR}} = 5$ (the paper's recommended default): timesteps where $\text{SNR} < 5$ receive full weight; timesteps where $\text{SNR} > 5$ are downweighted. The weighted loss is:
 
-$$\mathcal{L}_{\text{MinSNR}} = \mathbb{E}_{t}\!\left[w(t) \cdot \|\hat{v}_t - v_t\|^2\right] \tag{8.4}$$
+$$
+\mathcal{L}_{\text{MinSNR}} = \mathbb{E}_{t}\!\left[w(t) \cdot \|\hat{v}_t - v_t\|^2\right] \tag{8.4}
+$$
 
 Hang et al. report a **3.4× speedup** in reaching FID 10 compared to previous weighting strategies.
 
@@ -686,19 +820,27 @@ This section derives the conformal prediction framework. Standard split conforma
 
 **Setup** (Vovk et al., 2005; Lei et al., 2018). Given exchangeable calibration data $\{(\mathbf{X}_i, Y_i)\}_{i=1}^n$ and a pre-trained model $\hat{f}$ with uncertainty estimate $\hat{\sigma}$, define the **normalized nonconformity score** (Angelopoulos & Bates, 2021, §2.3.2):
 
-$$R_i = \frac{|Y_i - \hat{f}(\mathbf{X}_i)|}{\hat{\sigma}(\mathbf{X}_i)} \tag{9.1}$$
+$$
+R_i = \frac{|Y_i - \hat{f}(\mathbf{X}_i)|}{\hat{\sigma}(\mathbf{X}_i)} \tag{9.1}
+$$
 
 The conformal quantile is the $\lceil(n+1)(1-\alpha)\rceil / n$-th empirical quantile of $\{R_1, \ldots, R_n\}$:
 
-$$\hat{q} = \text{Quantile}\!\left(\{R_i\}_{i=1}^n,\; \frac{\lceil(n+1)(1-\alpha)\rceil}{n}\right) \tag{9.2}$$
+$$
+\hat{q} = \text{Quantile}\!\left(\{R_i\}_{i=1}^n,\; \frac{\lceil(n+1)(1-\alpha)\rceil}{n}\right) \tag{9.2}
+$$
 
 The prediction interval for a new test point $\mathbf{X}_{n+1}$ is:
 
-$$C(\mathbf{X}_{n+1}) = \left[\hat{f}(\mathbf{X}_{n+1}) - \hat{q}\,\hat{\sigma}(\mathbf{X}_{n+1}),\;\; \hat{f}(\mathbf{X}_{n+1}) + \hat{q}\,\hat{\sigma}(\mathbf{X}_{n+1})\right] \tag{9.3}$$
+$$
+C(\mathbf{X}_{n+1}) = \left[\hat{f}(\mathbf{X}_{n+1}) - \hat{q}\,\hat{\sigma}(\mathbf{X}_{n+1}),\;\; \hat{f}(\mathbf{X}_{n+1}) + \hat{q}\,\hat{\sigma}(\mathbf{X}_{n+1})\right] \tag{9.3}
+$$
 
 **Coverage guarantee** (Vovk et al., 2005, Ch. 2; Angelopoulos & Bates, 2021, Theorem 1). For exchangeable data:
 
-$$1 - \alpha \;\leq\; \mathbb{P}(Y_{n+1} \in C(\mathbf{X}_{n+1})) \;\leq\; 1 - \alpha + \frac{1}{n+1} \tag{9.4}$$
+$$
+1 - \alpha \;\leq\; \mathbb{P}(Y_{n+1} \in C(\mathbf{X}_{n+1})) \;\leq\; 1 - \alpha + \frac{1}{n+1} \tag{9.4}
+$$
 
 This is a **finite-sample, distribution-free** guarantee. It holds regardless of the quality of $\hat{f}$ or the distribution of the data — only exchangeability is required. [Exact.]
 
@@ -710,11 +852,15 @@ This is a **finite-sample, distribution-free** guarantee. It holds regardless of
 
 For applications requiring coverage at **all spatial locations simultaneously**, motivated by multivariate-output conformal prediction (Feldman et al., JMLR 2023), we define the **spatial maximum** nonconformity score:
 
-$$R_i^{\text{spatial}} = \max_{(m,n)} \frac{|T_i^{\text{true}}(m,n) - \bar{T}_i(m,n)|}{\sigma_i(m,n)} \tag{9.5}$$
+$$
+R_i^{\text{spatial}} = \max_{(m,n)} \frac{|T_i^{\text{true}}(m,n) - \bar{T}_i(m,n)|}{\sigma_i(m,n)} \tag{9.5}
+$$
 
 where $\bar{T}_i$ and $\sigma_i$ are the ensemble mean and standard deviation for calibration sample $i$. Applying split conformal prediction (9.2) to the scalar scores $\{R_i^{\text{spatial}}\}$ yields a prediction band:
 
-$$C_{\text{spatial}}(\mathbf{X}) = \left\{T : |T(m,n) - \bar{T}(m,n)| \leq \hat{q} \cdot \sigma(m,n) \;\;\forall\, (m,n)\right\} \tag{9.6}$$
+$$
+C_{\text{spatial}}(\mathbf{X}) = \left\{T : |T(m,n) - \bar{T}(m,n)| \leq \hat{q} \cdot \sigma(m,n) \;\;\forall\, (m,n)\right\} \tag{9.6}
+$$
 
 with the guarantee $\mathbb{P}(T_{n+1}^{\text{true}} \in C_{\text{spatial}}(\mathbf{X}_{n+1})) \geq 1 - \alpha$, where inclusion means the bound holds at all pixels simultaneously. This guarantee is valid but **conservative by construction**: calibrating to the worst-case pixel produces wider bands than necessary for most spatial locations. Both variants are implemented; the spatial variant was not included in the primary benchmark results.
 
@@ -746,11 +892,15 @@ This section derives the DPS framework for PDE inverse problems. Unlike the cond
 
 Given sparse noisy boundary observations $\tilde{\mathbf{g}} = \mathcal{H}(T) + \boldsymbol{\varepsilon}$ from §5.1, the posterior is:
 
-$$p(T | \tilde{\mathbf{g}}) \propto \underbrace{p(T)}_{\text{prior}} \cdot \underbrace{p(\tilde{\mathbf{g}} | T)}_{\text{likelihood}} \tag{10.1}$$
+$$
+p(T | \tilde{\mathbf{g}}) \propto \underbrace{p(T)}_{\text{prior}} \cdot \underbrace{p(\tilde{\mathbf{g}} | T)}_{\text{likelihood}} \tag{10.1}
+$$
 
 DPS (Chung et al., ICLR 2023) decomposes the posterior score via Bayes' rule:
 
-$$\nabla_{\mathbf{x}_t} \log p_t(\mathbf{x}_t | \tilde{\mathbf{g}}) = \underbrace{\nabla_{\mathbf{x}_t} \log p_t(\mathbf{x}_t)}_{\text{unconditional score}} + \underbrace{\nabla_{\mathbf{x}_t} \log p_t(\tilde{\mathbf{g}} | \mathbf{x}_t)}_{\text{likelihood score}} \tag{10.2}$$
+$$
+\nabla_{\mathbf{x}_t} \log p_t(\mathbf{x}_t | \tilde{\mathbf{g}}) = \underbrace{\nabla_{\mathbf{x}_t} \log p_t(\mathbf{x}_t)}_{\text{unconditional score}} + \underbrace{\nabla_{\mathbf{x}_t} \log p_t(\tilde{\mathbf{g}} | \mathbf{x}_t)}_{\text{likelihood score}} \tag{10.2}
+$$
 
 The unconditional score is estimated by a diffusion/flow model trained on clean Laplace solutions without boundary condition input. The likelihood score requires marginalizing over $p_t(\mathbf{x}_0 | \mathbf{x}_t)$, which is intractable.
 
@@ -758,23 +908,31 @@ The unconditional score is estimated by a diffusion/flow model trained on clean 
 
 **Core approximation** (Chung et al., ICLR 2023, Algorithm 1). Replace the intractable marginalization with a point estimate at the Tweedie denoised mean:
 
-$$p_t(\tilde{\mathbf{g}} | \mathbf{x}_t) \approx p(\tilde{\mathbf{g}} | \hat{\mathbf{x}}_0), \quad \hat{\mathbf{x}}_0 = \frac{\mathbf{x}_t - \sqrt{1-\bar{\alpha}_t}\,\boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t)}{\sqrt{\bar{\alpha}_t}} \tag{10.3}$$
+$$
+p_t(\tilde{\mathbf{g}} | \mathbf{x}_t) \approx p(\tilde{\mathbf{g}} | \hat{\mathbf{x}}_0), \quad \hat{\mathbf{x}}_0 = \frac{\mathbf{x}_t - \sqrt{1-\bar{\alpha}_t}\,\boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t)}{\sqrt{\bar{\alpha}_t}} \tag{10.3}
+$$
 
 For Gaussian observations $\tilde{\mathbf{g}} | T \sim \mathcal{N}(\mathcal{H}(T), \sigma_{\text{obs}}^2 \mathbf{I})$, the likelihood gradient becomes:
 
-$$\nabla_{\mathbf{x}_t} \log p_t(\tilde{\mathbf{g}} | \mathbf{x}_t) \approx -\frac{1}{\sigma_{\text{obs}}^2} \nabla_{\mathbf{x}_t} \|\tilde{\mathbf{g}} - \mathcal{H}(\hat{\mathbf{x}}_0)\|^2 \tag{10.4}$$
+$$
+\nabla_{\mathbf{x}_t} \log p_t(\tilde{\mathbf{g}} | \mathbf{x}_t) \approx -\frac{1}{\sigma_{\text{obs}}^2} \nabla_{\mathbf{x}_t} \|\tilde{\mathbf{g}} - \mathcal{H}(\hat{\mathbf{x}}_0)\|^2 \tag{10.4}
+$$
 
 ### 10.3 Dual Guidance: Measurement + Physics
 
 Following DiffusionPDE (Huang et al., NeurIPS 2024, Eq. 8), we extend the DPS update with a **physics guidance** term:
 
-$$\mathbf{x}_{t-1} = \text{reverse\_step}(\mathbf{x}_t) - \zeta_{\text{obs}} \nabla_{\mathbf{x}_t} \underbrace{\|\tilde{\mathbf{g}} - \mathcal{H}(\hat{\mathbf{x}}_0)\|^2}_{\mathcal{L}_{\text{obs}}} - \zeta_{\text{pde}} \nabla_{\mathbf{x}_t} \underbrace{\|\nabla^2 \hat{\mathbf{x}}_0\|^2}_{\mathcal{L}_{\text{pde}}} \tag{10.5}$$
+$$
+\mathbf{x}_{t-1} = \text{reverse\_step}(\mathbf{x}_t) - \zeta_{\text{obs}} \nabla_{\mathbf{x}_t} \underbrace{\|\tilde{\mathbf{g}} - \mathcal{H}(\hat{\mathbf{x}}_0)\|^2}_{\mathcal{L}_{\text{obs}}} - \zeta_{\text{pde}} \nabla_{\mathbf{x}_t} \underbrace{\|\nabla^2 \hat{\mathbf{x}}_0\|^2}_{\mathcal{L}_{\text{pde}}} \tag{10.5}
+$$
 
 The measurement term $\mathcal{L}_{\text{obs}}$ pushes samples toward consistency with the noisy observations. The physics term $\mathcal{L}_{\text{pde}}$ pushes samples toward the Laplace solution manifold. The guidance strengths $\zeta_{\text{obs}}, \zeta_{\text{pde}}$ are annealed during sampling (stronger early, weaker late).
 
 **For flow matching**, the denoised estimate at ODE step $i$ (out of $N$ steps) is:
 
-$$\hat{\mathbf{x}}_0 \approx \mathbf{x}_t + (1 - t)\,v_\theta(\mathbf{x}_t, t) \tag{10.6}$$
+$$
+\hat{\mathbf{x}}_0 \approx \mathbf{x}_t + (1 - t)\,v_\theta(\mathbf{x}_t, t) \tag{10.6}
+$$
 
 which replaces the DDPM Tweedie estimate (10.3). The guidance gradients (10.4)–(10.5) apply identically.
 
@@ -793,33 +951,47 @@ The key advantage of DPS over conditional models: **a single unconditional model
 ### 11.1 Deterministic Metrics
 
 **Mean Squared Error (MSE):**
-$$\text{MSE} = \frac{1}{N^2} \sum_{i,j} (\hat{T}_{i,j} - T_{i,j}^{\text{true}})^2 \tag{11.1}$$
+$$
+\text{MSE} = \frac{1}{N^2} \sum_{i,j} (\hat{T}_{i,j} - T_{i,j}^{\text{true}})^2 \tag{11.1}
+$$
 
 **Relative $L^2$ error:**
-$$\text{Rel-}L^2 = \frac{\|\hat{T} - T^{\text{true}}\|_2}{\|T^{\text{true}}\|_2} = \frac{\left(\sum_{i,j} (\hat{T}_{i,j} - T_{i,j}^{\text{true}})^2\right)^{1/2}}{\left(\sum_{i,j} (T_{i,j}^{\text{true}})^2\right)^{1/2}} \tag{11.2}$$
+$$
+\text{Rel-}L^2 = \frac{\|\hat{T} - T^{\text{true}}\|_2}{\|T^{\text{true}}\|_2} = \frac{\left(\sum_{i,j} (\hat{T}_{i,j} - T_{i,j}^{\text{true}})^2\right)^{1/2}}{\left(\sum_{i,j} (T_{i,j}^{\text{true}})^2\right)^{1/2}} \tag{11.2}
+$$
 
 **Maximum pointwise error:**
-$$\text{MaxErr} = \max_{i,j} |\hat{T}_{i,j} - T_{i,j}^{\text{true}}| \tag{11.3}$$
+$$
+\text{MaxErr} = \max_{i,j} |\hat{T}_{i,j} - T_{i,j}^{\text{true}}| \tag{11.3}
+$$
 
 ### 11.2 Physics Compliance Metrics
 
 **Laplacian residual.** The mean squared PDE residual over the interior:
 
-$$R_{\text{PDE}} = \frac{1}{(N-2)^2} \sum_{i,j} r_{i,j}^2 \tag{11.4}$$
+$$
+R_{\text{PDE}} = \frac{1}{(N-2)^2} \sum_{i,j} r_{i,j}^2 \tag{11.4}
+$$
 
 where $r_{i,j}$ is from (6.1). For the FD numerical oracle, $R_{\text{PDE}}$ is empirically $\sim 10^{-10}$ (Table 2), reflecting accumulated floating-point error in the LU solve and residual computation — the field is the exact solution of the discrete linear system $L\mathbf{u} = \mathbf{b}$ to machine precision, but the residual computation amplifies rounding errors. This is the discrete residual, not the truncation error vs the continuum solution (see the three-quantity distinction in §2.2). For neural surrogates, $R_{\text{PDE}}$ measures how well the prediction satisfies $\nabla^2 T = 0$ — for unconstrained surrogate predictions and for physics-regularized generative variants (§6).
 
 **Boundary condition error:**
-$$E_{\text{BC}} = \frac{1}{4N} \sum_{\text{edges}} \sum_{k} |\hat{T}_k^{\text{edge}} - g_k^{\text{true}}|^2 \tag{11.5}$$
+$$
+E_{\text{BC}} = \frac{1}{4N} \sum_{\text{edges}} \sum_{k} |\hat{T}_k^{\text{edge}} - g_k^{\text{true}}|^2 \tag{11.5}
+$$
 
 **Maximum principle violations.** Fraction of interior points violating (2.1):
 
-$$V_{\text{MP}} = \frac{1}{(N-2)^2} \sum_{i,j} \mathbb{1}\!\left[\hat{T}_{i,j} < \min_{\partial\Omega} g - \delta \;\text{ or }\; \hat{T}_{i,j} > \max_{\partial\Omega} g + \delta\right] \tag{11.6}$$
+$$
+V_{\text{MP}} = \frac{1}{(N-2)^2} \sum_{i,j} \mathbb{1}\!\left[\hat{T}_{i,j} < \min_{\partial\Omega} g - \delta \;\text{ or }\; \hat{T}_{i,j} > \max_{\partial\Omega} g + \delta\right] \tag{11.6}
+$$
 
 with tolerance $\delta = 10^{-6}$ to absorb numerical noise.
 
 **Dirichlet energy functional:**
-$$\mathcal{E}[T] = \frac{1}{2} \int_\Omega |\nabla T|^2 \, dA \approx \frac{h^2}{2} \sum_{i,j} \left[\left(\frac{T_{i+1,j} - T_{i-1,j}}{2h}\right)^2 + \left(\frac{T_{i,j+1} - T_{i,j-1}}{2h}\right)^2\right] \tag{11.7}$$
+$$
+\mathcal{E}[T] = \frac{1}{2} \int_\Omega |\nabla T|^2 \, dA \approx \frac{h^2}{2} \sum_{i,j} \left[\left(\frac{T_{i+1,j} - T_{i-1,j}}{2h}\right)^2 + \left(\frac{T_{i,j+1} - T_{i,j-1}}{2h}\right)^2\right] \tag{11.7}
+$$
 
 The Dirichlet energy is minimized by harmonic functions (solutions of Laplace's equation). Comparing $\mathcal{E}[\hat{T}]$ to $\mathcal{E}[T^{\text{true}}]$ tests whether the surrogate's prediction is near the energy minimum.
 
@@ -830,22 +1002,30 @@ The Dirichlet energy is minimized by harmonic functions (solutions of Laplace's 
 Beyond pixel-level comparison, we evaluate uncertainty on derived quantities that a practitioner might care about. Each functional maps a solution field to a scalar:
 
 **Center temperature:**
-$$\mathcal{Q}_1[T] = T(0.5, 0.5) \tag{11.8}$$
+$$
+\mathcal{Q}_1[T] = T(0.5, 0.5) \tag{11.8}
+$$
 
 (bilinear interpolation if the center falls between grid points).
 
 **Subregion mean temperature:**
-$$\mathcal{Q}_2[T] = \frac{1}{|S|} \int_S T \, dA, \quad S = [0.25, 0.75]^2 \tag{11.9}$$
+$$
+\mathcal{Q}_2[T] = \frac{1}{|S|} \int_S T \, dA, \quad S = [0.25, 0.75]^2 \tag{11.9}
+$$
 
 **Maximum interior temperature:**
-$$\mathcal{Q}_3[T] = \max_{(x,y) \in \Omega^\circ} T(x,y) \tag{11.10}$$
+$$
+\mathcal{Q}_3[T] = \max_{(x,y) \in \Omega^\circ} T(x,y) \tag{11.10}
+$$
 
 (a nonlinear functional — harder to predict uncertainty for).
 
 **Dirichlet energy** $\mathcal{Q}_4 = \mathcal{E}[T]$ from (11.7).
 
 **Top-edge normal derivative (heat flux proxy):**
-$$\mathcal{Q}_5[T] = \int_0^1 \left.\frac{\partial T}{\partial y}\right|_{y=1} dx \approx h \sum_j \frac{T_{N-1,j} - T_{N-2,j}}{h} \tag{11.11}$$
+$$
+\mathcal{Q}_5[T] = \int_0^1 \left.\frac{\partial T}{\partial y}\right|_{y=1} dx \approx h \sum_j \frac{T_{N-1,j} - T_{N-2,j}}{h} \tag{11.11}
+$$
 
 **Convention note.** $\mathcal{Q}_5$ is the integrated outward normal derivative $\partial T/\partial n$ at the top edge (where $\hat{n} = +\hat{y}$), not the physical conductive heat flux $q_n = -k\,\partial T/\partial n$. Since we work in dimensionless units with $k = 1$, the physical flux is $-\mathcal{Q}_5$. We report the normal derivative directly; the sign is a convention that does not affect CRPS or coverage evaluation.
 
@@ -861,13 +1041,17 @@ These functionals test whether the surrogate's uncertainty is well-calibrated fo
 
 **Definition.** [Exact; Gneiting & Raftery (2007).] The CRPS for a predictive distribution $F$ and observation $y$ is:
 
-$$\text{CRPS}(F, y) = \int_{-\infty}^{\infty} (F(z) - \mathbb{1}[z \geq y])^2 \, dz \tag{11.12}$$
+$$
+\text{CRPS}(F, y) = \int_{-\infty}^{\infty} (F(z) - \mathbb{1}[z \geq y])^2 \, dz \tag{11.12}
+$$
 
 CRPS is a **proper scoring rule**: it is minimized in expectation when the predictive distribution $F$ equals the true data-generating distribution. It simultaneously rewards calibration (the predictive CDF should match the empirical frequency of outcomes) and sharpness (narrower intervals score better, conditional on calibration).
 
 **Ensemble estimator.** For an ensemble of $K$ samples $X_1, \ldots, X_K$, the population CRPS identity $\mathbb{E}|X - y| - \frac{1}{2}\mathbb{E}|X - X'|$ (Gneiting & Raftery, 2007, Eq. 21) is estimated by the U-statistic (Ferro, 2014):
 
-$$\text{CRPS} = \frac{1}{K}\sum_{k=1}^{K} |X_k - y| - \frac{1}{2K(K-1)}\sum_{k=1}^{K}\sum_{l=1}^{K} |X_k - X_l| \tag{11.13}$$
+$$
+\text{CRPS} = \frac{1}{K}\sum_{k=1}^{K} |X_k - y| - \frac{1}{2K(K-1)}\sum_{k=1}^{K}\sum_{l=1}^{K} |X_k - X_l| \tag{11.13}
+$$
 
 This is the "fair" CRPS estimator of Ferro (2014), which uses $K(K-1)$ in the denominator of the second term rather than $K^2$, correcting a negative bias in the spread term present in the naive V-statistic estimator. The V-statistic *underestimates* the spread (pairwise) term by a factor of $(K-1)/K$ because it divides by $K^2$ instead of $K(K-1)$; in the loss orientation, this causes the naive CRPS to be biased high (forecasts appear less sharp than they are). At $K=5$, the correction changes the denominator from 25 to 20. We use the loss orientation (lower is better), which is the negated form of the positive-score convention in Gneiting & Raftery (2007).
 
@@ -881,7 +1065,9 @@ This is the "fair" CRPS estimator of Ferro (2014), which uses $K(K-1)$ in the de
 
 **Definition.** The $(1-\alpha)$ coverage rate is the fraction of pixels where the truth falls within the sample-based prediction interval:
 
-$$\text{Cov}_{1-\alpha} = \frac{1}{N^2} \sum_{i,j} \mathbb{1}\!\left[Q_{\alpha/2}^{(i,j)} \leq T_{i,j}^{\text{true}} \leq Q_{1-\alpha/2}^{(i,j)}\right] \tag{11.14}$$
+$$
+\text{Cov}_{1-\alpha} = \frac{1}{N^2} \sum_{i,j} \mathbb{1}\!\left[Q_{\alpha/2}^{(i,j)} \leq T_{i,j}^{\text{true}} \leq Q_{1-\alpha/2}^{(i,j)}\right] \tag{11.14}
+$$
 
 where $Q_p^{(i,j)}$ is the $p$-th quantile of the $K$ sample values at pixel $(i,j)$.
 
@@ -893,13 +1079,17 @@ For perfect calibration, $\text{Cov}_{0.9} = 0.9$. Under-coverage (< 0.9) indica
 
 **Interval width.** The mean width of the 90% prediction interval:
 
-$$\overline{W}_{0.9} = \frac{1}{N^2} \sum_{i,j} \left(Q_{0.95}^{(i,j)} - Q_{0.05}^{(i,j)}\right) \tag{11.15}$$
+$$
+\overline{W}_{0.9} = \frac{1}{N^2} \sum_{i,j} \left(Q_{0.95}^{(i,j)} - Q_{0.05}^{(i,j)}\right) \tag{11.15}
+$$
 
 Sharper intervals (smaller $\overline{W}$) are better, conditional on correct coverage.
 
 **Uncertainty-error correlation.** The Pearson correlation between pixel-level ensemble/sample standard deviation and absolute error:
 
-$$\rho = \text{corr}\!\left(\sigma_{i,j}, |T_{i,j}^{\text{true}} - \bar{T}_{i,j}|\right) \tag{11.16}$$
+$$
+\rho = \text{corr}\!\left(\sigma_{i,j}, |T_{i,j}^{\text{true}} - \bar{T}_{i,j}|\right) \tag{11.16}
+$$
 
 A high $\rho$ indicates that the model "knows what it doesn't know" — uncertainty is concentrated where errors are large.
 
