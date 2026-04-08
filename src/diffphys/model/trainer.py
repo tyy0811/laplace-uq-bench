@@ -341,6 +341,64 @@ def train_ddpm(config, device="cpu", commit_fn=None):
                           commit_fn=commit_fn)
 
 
+def train_unconditional_ddpm_one_epoch(ddpm, loader, optimizer, device):
+    """Train unconditional DDPM for one epoch (targets only, no conditioning)."""
+    ddpm.train()
+    total_loss = 0.0
+    n_batches = 0
+    for _cond, target in loader:
+        target = target.to(device)
+        loss = ddpm.training_step(target)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        total_loss += loss.item()
+        n_batches += 1
+    return total_loss / n_batches
+
+
+def validate_unconditional_ddpm(ddpm, loader, device):
+    """Compute average unconditional DDPM loss on validation set."""
+    ddpm.eval()
+    total_loss = 0.0
+    n_batches = 0
+    with torch.no_grad():
+        for _cond, target in loader:
+            target = target.to(device)
+            loss = ddpm.training_step(target)
+            total_loss += loss.item()
+            n_batches += 1
+    return total_loss / n_batches
+
+
+def train_unconditional_ddpm(config, device="cpu", commit_fn=None):
+    """Full unconditional DDPM training loop from config dict."""
+    from .unconditional_ddpm import UnconditionalDDPM
+
+    train_loader, val_loader = _make_loaders(config)
+
+    model = build_model(config["model"]).to(device)
+    ddpm_cfg = config["ddpm"]
+    ddpm = UnconditionalDDPM(
+        model,
+        T=ddpm_cfg["T"],
+        beta_start=ddpm_cfg.get("beta_start", 1e-4),
+        beta_end=ddpm_cfg.get("beta_end", 0.02),
+        schedule=ddpm_cfg.get("schedule", "cosine"),
+        prediction=ddpm_cfg.get("prediction", "v"),
+        min_snr_gamma=ddpm_cfg.get("min_snr_gamma", 5.0),
+    ).to(device)
+
+    optimizer = build_optimizer(ddpm, config["training"])
+    scheduler = build_scheduler(optimizer, config["training"])
+
+    return _training_loop(ddpm, train_loader, val_loader, optimizer, scheduler,
+                          config, device,
+                          train_unconditional_ddpm_one_epoch,
+                          validate_unconditional_ddpm,
+                          commit_fn=commit_fn)
+
+
 def train_cfm_one_epoch(cfm, loader, optimizer, device):
     """Train ConditionalFlowMatcher for one epoch. Returns average loss."""
     cfm.train()
