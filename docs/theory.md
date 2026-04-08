@@ -846,7 +846,7 @@ This is a **finite-sample, distribution-free** guarantee. It holds regardless of
 
 **Pixelwise application to PDE fields.** For PDE surrogate outputs, we apply a practical pooled-pixel conformal variant: all $n \times N^2$ pixel-level nonconformity scores are pooled across calibration samples and spatial locations, and the conformal quantile $\hat{q}$ is computed from this pooled set. This is intended to approximate **marginal pixelwise calibration** — producing tighter intervals than the spatial variant (§9.2) — and is the variant used in the benchmark results (Tables 3, 5).
 
-**Exchangeability caveat.** The textbook split-conformal guarantee (9.4) assumes exchangeable calibration scores. Pooling across spatial locations introduces dependence: pixels within the same field are spatially correlated, so the $n \times N^2$ pooled scores are not fully exchangeable. In practice, the large pool size ($n \times N^2 \gg 1$) and the averaging over many independent calibration fields make the procedure well-behaved empirically, but the formal finite-sample guarantee (9.4) does not strictly apply to this pooled construction. The reported near-nominal 90% coverage across regimes is an empirical observation, not a rigorous theoretical guarantee.
+**Exchangeability caveat.** The textbook split-conformal guarantee (9.4) assumes exchangeable calibration scores. Pooling across spatial locations introduces dependence: pixels within the same field are spatially correlated, so the $n \times N^2$ pooled scores are not fully exchangeable. In practice, the large pool size ($n \times N^2 \gg 1$) and the averaging over many independent calibration fields make the procedure well-behaved empirically, but the formal finite-sample guarantee (9.4) does not strictly apply to this pooled construction. The reported near-nominal 90% coverage across regimes is an empirical observation, not a rigorous theoretical guarantee. Readers seeking a strictly rigorous coverage guarantee should focus on the scalar functional CRPS results in §11.3, which satisfy the standard split-conformal exchangeability assumption; the pooled-pixel variant is included for visualization convenience and its reported near-nominal coverage is an empirical observation.
 
 ### 9.2 Spatial Conformal Prediction (Additional Variant)
 
@@ -878,7 +878,7 @@ with the guarantee $\mathbb{P}(T_{n+1}^{\text{true}} \in C_{\text{spatial}}(\mat
 
 **Important distinction.** The conformal guarantee applies to the *prediction band* $C(\mathbf{X})$, not to the *ensemble posterior* itself. If the ensemble's uncertainty estimates $\hat{\sigma}$ are poorly correlated with actual errors, the conformal band will be wide (to compensate); for standard split conformal the coverage guarantee holds, while for the pooled-pixel variant used here coverage is assessed empirically. Conformal prediction fixes the coverage of the output interval; it does not retroactively calibrate the base model's probabilistic predictions.
 
-**Empirical outcome (pixelwise conformal, in-distribution, all regimes).** Pixelwise conformal prediction lifted all methods to near-nominal 90% coverage across all observation regimes. But the interval widths varied substantially: under sparse-noisy conditions, DDPM pixelwise conformal intervals averaged 0.088, versus 0.131 (FM) and 0.135 (ensemble). This confirms that the raw uncertainty quality — not the conformal wrapper — determines the practical utility of the prediction bands. Results are from single training runs.
+**Empirical outcome (pixelwise conformal, in-distribution, all regimes, matched K=5).** Pixelwise conformal prediction lifted all methods to near-nominal 90% coverage across all observation regimes. But the interval widths varied substantially: under sparse-noisy conditions at matched K=5, DDPM pixelwise conformal intervals averaged 0.115, versus 0.156 (FM) and 0.133 (ensemble). This confirms that the raw uncertainty quality — not the conformal wrapper — determines the practical utility of the prediction bands. These results use matched K=5 samples across all methods. At K=20 generative samples (see Appendix Table A1 in benchmark_results.md), the gap widens as expected, but the matched comparison is the primary reported claim. Results are from single training runs.
 
 *Implemented in `src/diffphys/evaluation/conformal.py`. Tested in `tests/test_conformal.py`.*
 
@@ -1075,7 +1075,7 @@ where $Q_p^{(i,j)}$ is the $p$-th quantile of the $K$ sample values at pixel $(i
 
 For perfect calibration, $\text{Cov}_{0.9} = 0.9$. Under-coverage (< 0.9) indicates overconfident uncertainty; over-coverage (> 0.9) indicates overly conservative uncertainty.
 
-**Empirical outcome (pixelwise coverage, 20 generative samples, in-distribution).** Ensemble raw coverage at the 90% target degrades severely as observation quality decreases: 82% (exact) → 55% (dense-noisy) → 31% (sparse-noisy) → 15% (very-sparse). Generative models (using 20 samples for mean/std estimation) maintain 84–99% raw coverage across all regimes. After pixelwise conformal calibration, all methods achieve near-nominal 90% coverage, but the ensemble requires the widest intervals to compensate for its poor raw calibration. Note: the 20-sample generative evaluation gives FM/DDPM a statistical advantage over the 5-member ensemble; matched pixel-level comparison at 5 samples is pending.
+**Empirical outcome (pixelwise coverage, matched K=5, in-distribution).** Ensemble raw coverage at the 90% target degrades severely as observation quality decreases: 82% (exact) → 55% (dense-noisy) → 31% (sparse-noisy) → 15% (very-sparse). Generative models at matched K=5 maintain 77–95% raw coverage across all regimes — lower than at K=20 (where they achieve 84–99%) due to coarser quantile estimation, but still substantially above the ensemble's raw coverage. After pixelwise conformal calibration, all methods achieve near-nominal 88–91% coverage, but the ensemble requires the widest intervals to compensate for its poor raw calibration. DDPM produces the tightest conformal intervals at every regime (e.g., sparse-noisy: 0.115 vs 0.156 FM vs 0.133 ensemble).
 
 **Interval width.** The mean width of the 90% prediction interval:
 
@@ -1107,9 +1107,9 @@ A conditional generative model (FM or DDPM) is considered meaningfully better th
 
 This protocol is pre-committed to avoid post-hoc rationalization: "FM is better if you use enough samples" is a weaker claim than "FM is better sample-for-sample."
 
-**Current status.** Functional-level CRPS (§11.3) uses matched 5v5 as the primary comparison. Pixel-level coverage and interval-width metrics currently use 20 samples for generative models vs 5 ensemble members, giving generative models a statistical advantage in mean/std estimation. A matched pixel-level comparison at 5 samples is a planned follow-up.
+**Current status.** All core UQ comparisons — functional CRPS, pixel coverage, and interval width — use matched K=5 samples. A K=20 generative comparison is reported in Appendix Table A1 of `docs/benchmark_results.md` for reference, showing how the advantage scales with inference compute, but the matched comparison is the primary claim.
 
-*Matched-sample evaluation logic in `experiments/evaluate_phase2.py`.*
+*Matched-sample evaluation logic in `scripts/evaluate_phase2.py` and `modal_deploy/evaluate_remote.py`.*
 
 ### 11.7 Calibration Diagrams
 
@@ -1316,16 +1316,16 @@ Major empirical claims made in the theory document are traceable to the followin
 
 | Claim (section) | Result artifact | Evaluation script |
 |---|---|---|
-| DDPM achieves lowest functional CRPS on all 5 quantities (§11.3) | `docs/benchmark_results.md` Table 4 | `experiments/evaluate_phase2.py --eval-type functional-crps` |
-| Ensemble raw coverage degrades 82%→15% across regimes (§11.5) | `docs/benchmark_results.md` Table 5 | `experiments/evaluate_phase2.py --eval-type phase2-all` |
-| Pixelwise conformal lifts all methods to ~90% coverage (§9.3) | `docs/benchmark_results.md` Tables 3, 5 | `experiments/evaluate_conformal.py` |
-| DDPM conformal intervals tightest (0.088 vs 0.131/0.135, sparse-noisy) (§9.3) | `docs/benchmark_results.md` Table 5 | `experiments/evaluate_conformal.py` |
-| FM underperforms DDPM on functional CRPS despite simpler training (§7.5) | `docs/benchmark_results.md` Table 4 | `experiments/evaluate_phase2.py --eval-type functional-crps` |
-| Improved DDPM achieves 85–99% raw coverage across regimes (§8) | `docs/benchmark_results.md` Table 5 | `experiments/evaluate_phase2.py --eval-type phase2-all` |
-| Standard DDPM at 60 epochs achieved 16.8% raw coverage (§8, diagnostic) | Phase 1 diagnostic run (not in benchmark tables) | `experiments/diagnose_ddpm.py` |
-| FNO underperforms U-Net by ~40× on rel. L2 (§3.2) | `docs/benchmark_results.md` Table 1 | `experiments/evaluate_phase1.py` |
-| OOD: DDPM shows lower reported calibration error than ensemble across regimes | `docs/benchmark_results.md` Table 6 | `experiments/evaluate_phase2.py --eval-type ood-regimes` |
-| Training convergence: FM vs improved DDPM (§8) | `figures/fig10_convergence.png` | `experiments/generate_figures.py` |
+| DDPM achieves lowest functional CRPS on all 5 quantities (§11.3) | `docs/benchmark_results.md` Table 4 | `modal_deploy/evaluate_remote.py --eval-type functional-crps` |
+| Ensemble raw coverage degrades 82%→15% across regimes (§11.5) | `docs/benchmark_results.md` Table 5 | `modal_deploy/evaluate_remote.py --eval-type phase2-all` |
+| Pixelwise conformal lifts all methods to ~90% coverage (§9.3) | `docs/benchmark_results.md` Tables 3, 5 | `modal_deploy/evaluate_remote.py --eval-type conformal` |
+| DDPM conformal intervals tightest at matched K=5 (0.115 vs 0.156/0.133, sparse-noisy) (§9.3) | `docs/benchmark_results.md` Table 5 | `modal_deploy/evaluate_remote.py --eval-type conformal` |
+| FM underperforms DDPM on functional CRPS despite simpler training (§7.5) | `docs/benchmark_results.md` Table 4 | `modal_deploy/evaluate_remote.py --eval-type functional-crps` |
+| Improved DDPM achieves 77–95% raw coverage at matched K=5 across regimes (§8, §11.5) | `docs/benchmark_results.md` Table 5 | `modal_deploy/evaluate_remote.py --eval-type phase2-all` |
+| Standard DDPM at 60 epochs achieved 16.8% raw coverage (§8, diagnostic) | Phase 1 diagnostic run (not in benchmark tables) | `modal_deploy/evaluate_remote.py --eval-type diagnose` |
+| FNO underperforms U-Net by ~40× on rel. L2 (§3.2) | `docs/benchmark_results.md` Table 1 | `modal_deploy/evaluate_remote.py --eval-type phase1` |
+| OOD: DDPM shows lower calibration error than ensemble at matched K=5 across regimes | `docs/benchmark_results.md` Table 6 | `modal_deploy/evaluate_remote.py --eval-type ood-regimes` |
+| Training convergence: FM vs improved DDPM (§8) | `figures/fig10_convergence.png` | `scripts/plot_figures.py` |
 
 All result numbers cited in the theory document are from single training runs (one checkpoint per model). See §16 closing note for replication scope.
 
@@ -1545,3 +1545,5 @@ All result numbers cited in the theory document are from single training runs (o
 *This document provides the theoretical backbone for the `laplace-uq-bench` repository. Every equation maps to a specific source file (§13), every claim has a validation test (§14), and every approximation is marked explicitly. Numerical quantities are distinguished carefully: truncation error vs analytical solution, discrete residual of the linear system, and automated test tolerances are three separate things (§2.2). All posterior claims are scoped to the synthetic BC prior (§5.2). The project compares neural surrogates under controlled conditions — the theory ensures we know what we are measuring and why.*
 
 **Replication scope.** All empirical results cited in this document (§§3.2, 7.5, 8, 9.3, 11.3, 11.5) are from **single training runs** — one checkpoint per model, evaluated on fixed test splits. No results are averaged over multiple seeds or replicated runs. Model rankings (e.g., "DDPM achieved the lowest functional CRPS") reflect this single-run comparison and should be interpreted accordingly: they demonstrate that the ranking is achievable, not that it is statistically guaranteed to hold under retraining. Replication across seeds is a planned follow-up.
+
+**Revision note (April 2026).** Pixel-level coverage, interval width, and conformal metrics were re-evaluated at matched K=5 samples for all methods, replacing the previous K=20 generative evaluation. This closes the sample-count fairness caveat described in §11.6. The K=20 numbers are retained in Appendix Table A1 of `docs/benchmark_results.md` for reference.
