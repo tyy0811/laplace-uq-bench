@@ -38,12 +38,13 @@ python scripts/evaluate_phase2.py --model-type ensemble \
 python scripts/evaluate_phase2.py --model-type ddpm \
     --config configs/ddpm_improved.yaml \
     --checkpoints experiments/ddpm_improved/best.pt \
-    --n-samples 20 \
+    --n-samples 5 \
     --output experiments/ddpm_improved/uq_results.json --device cuda
 
 python scripts/evaluate_phase2.py --model-type flow_matching \
     --config configs/flow_matching.yaml \
     --checkpoints experiments/flow_matching/best.pt \
+    --n-samples 5 \
     --output experiments/flow_matching/uq_results.json --device cuda
 
 echo "=== Done ==="

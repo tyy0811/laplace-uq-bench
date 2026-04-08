@@ -32,7 +32,7 @@ def evaluate_ensemble_uq(ensemble, loader, device):
     return _compute_uq_summary(true, mean, std)
 
 
-def evaluate_cfm_uq(cfm, loader, device, n_samples=20):
+def evaluate_cfm_uq(cfm, loader, device, n_samples=5):
     """Evaluate flow matching UQ metrics using sample mean/std."""
     all_true, all_mean, all_std = [], [], []
     total_batches = len(loader)
@@ -55,7 +55,7 @@ def evaluate_cfm_uq(cfm, loader, device, n_samples=20):
     return _compute_uq_summary(true, mean, std)
 
 
-def evaluate_ddpm_uq(ddpm, loader, device, n_samples=20):
+def evaluate_ddpm_uq(ddpm, loader, device, n_samples=5):
     """Evaluate DDPM UQ metrics using sample mean/std."""
     all_true, all_mean, all_std = [], [], []
     total_batches = len(loader)
@@ -95,7 +95,7 @@ def collect_ensemble_predictions(ensemble, loader, device):
     return np.concatenate(all_mean), np.concatenate(all_std), np.concatenate(all_true)
 
 
-def collect_generative_predictions(model, loader, device, n_samples=20):
+def collect_generative_predictions(model, loader, device, n_samples=5):
     """Collect raw generative model predictions as numpy arrays.
 
     Works for both DDPM and CFM (any model with .sample(cond, n_samples)).
@@ -190,7 +190,7 @@ def _compute_uq_summary(true, mean, std):
 
 
 def run_phase2_evaluation(model_type, config_path, checkpoint_paths,
-                          test_npz, device="cpu", n_samples=None):
+                          test_npz, device="cpu", n_samples=5):
     """Evaluate a model under all observation regimes.
 
     Args:
@@ -227,7 +227,7 @@ def run_phase2_evaluation(model_type, config_path, checkpoint_paths,
             ckpt = torch.load(checkpoint_paths[0], map_location=device)
             ddpm.load_state_dict(ckpt["model_state_dict"])
             results[regime] = evaluate_ddpm_uq(
-                ddpm, loader, device, n_samples=n_samples or 20)
+                ddpm, loader, device, n_samples=n_samples)
 
         elif model_type == "flow_matching":
             from ..model.flow_matching import ConditionalFlowMatcher
@@ -241,6 +241,6 @@ def run_phase2_evaluation(model_type, config_path, checkpoint_paths,
             ckpt = torch.load(checkpoint_paths[0], map_location=device)
             cfm.load_state_dict(ckpt["model_state_dict"])
             results[regime] = evaluate_cfm_uq(
-                cfm, loader, device, n_samples=n_samples or 20)
+                cfm, loader, device, n_samples=n_samples)
 
     return results

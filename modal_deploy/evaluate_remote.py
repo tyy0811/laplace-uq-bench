@@ -76,7 +76,7 @@ def evaluate_phase1():
     timeout=3600 * 4,
     volumes={"/data": volume},
 )
-def evaluate_ensemble_uq():
+def evaluate_ensemble_uq(n_samples_generative: int = 5):  # noqa: ARG001 — accepted for API consistency, ensemble has 5 fixed members
     """Evaluate ensemble under all observation regimes."""
     import json
     import time
@@ -113,7 +113,7 @@ def evaluate_ensemble_uq():
     timeout=3600 * 24,
     volumes={"/data": volume},
 )
-def evaluate_ddpm_uq(max_samples: int = 300):
+def evaluate_ddpm_uq(max_samples: int = 300, n_samples_generative: int = 5):
     """Evaluate improved DDPM under all observation regimes, with per-regime checkpointing."""
     import json
     import time
@@ -128,16 +128,10 @@ def evaluate_ddpm_uq(max_samples: int = 300):
     os.makedirs(out_dir, exist_ok=True)
     partial_path = os.path.join(out_dir, "uq_partial.json")
 
-    # Load existing partial results for warm start
-    if os.path.exists(partial_path):
-        with open(partial_path) as f:
-            state = json.load(f)
-        results = state.get("metrics", {})
-        total_time = state.get("eval_time_seconds", 0.0)
+    run_params = {"max_samples": max_samples, "n_samples_generative": n_samples_generative, "model": "ddpm_improved"}
+    results, total_time = _load_partial_with_validation(partial_path, run_params)
+    if results:
         print(f"Resuming from {len(results)} completed regimes: {list(results.keys())}")
-    else:
-        results = {}
-        total_time = 0.0
 
     config = load_config("/root/configs/ddpm_improved.yaml")
     model = build_model(config["model"]).to("cuda")
@@ -155,11 +149,11 @@ def evaluate_ddpm_uq(max_samples: int = 300):
         ds = LaplacePDEDataset("/data/test_in.npz", regime=regime)
         if max_samples and max_samples < len(ds):
             ds = torch.utils.data.Subset(ds, range(max_samples))
-        print(f"  Using {len(ds)} samples, 20 samples each")
+        print(f"  Using {len(ds)} samples, {n_samples_generative} samples each")
         loader = torch.utils.data.DataLoader(ds, batch_size=32)
 
         t0 = time.time()
-        regime_results = _eval_ddpm(ddpm, loader, "cuda", n_samples=20)
+        regime_results = _eval_ddpm(ddpm, loader, "cuda", n_samples=n_samples_generative)
         elapsed = time.time() - t0
         total_time += elapsed
         print(f"  Completed {regime} in {elapsed:.1f}s")
@@ -170,16 +164,14 @@ def evaluate_ddpm_uq(max_samples: int = 300):
         results[regime] = regime_results
 
         # Save after each regime
-        state = {"metrics": results, "eval_time_seconds": total_time}
-        with open(partial_path, "w") as f:
-            json.dump(state, f, indent=2)
+        _save_partial(partial_path, results, total_time, run_params)
         volume.commit()
         print(f"  Checkpoint saved ({len(results)}/{len(REGIMES)} regimes)")
 
     # Write final results
     out_path = os.path.join(out_dir, "uq_results.json")
     with open(out_path, "w") as f:
-        json.dump({"metrics": results, "eval_time_seconds": total_time}, f, indent=2)
+        json.dump({"metrics": results, "eval_time_seconds": total_time, "run_params": run_params}, f, indent=2)
     volume.commit()
     print(f"\nAll done! Saved to {out_path}")
     return {"metrics": results, "eval_time_seconds": total_time}
@@ -191,7 +183,7 @@ def evaluate_ddpm_uq(max_samples: int = 300):
     timeout=3600 * 24,
     volumes={"/data": volume},
 )
-def evaluate_fm_uq(max_samples: int = 300):
+def evaluate_fm_uq(max_samples: int = 300, n_samples_generative: int = 5):
     """Evaluate flow matching under all observation regimes, with per-regime checkpointing."""
     import json
     import time
@@ -207,15 +199,10 @@ def evaluate_fm_uq(max_samples: int = 300):
     os.makedirs(out_dir, exist_ok=True)
     partial_path = os.path.join(out_dir, "uq_partial.json")
 
-    if os.path.exists(partial_path):
-        with open(partial_path) as f:
-            state = json.load(f)
-        results = state.get("metrics", {})
-        total_time = state.get("eval_time_seconds", 0.0)
+    run_params = {"max_samples": max_samples, "n_samples_generative": n_samples_generative, "model": "flow_matching"}
+    results, total_time = _load_partial_with_validation(partial_path, run_params)
+    if results:
         print(f"Resuming from {len(results)} completed regimes: {list(results.keys())}")
-    else:
-        results = {}
-        total_time = 0.0
 
     config = load_config("/root/configs/flow_matching.yaml")
     model = build_model(config["model"]).to("cuda")
@@ -238,11 +225,11 @@ def evaluate_fm_uq(max_samples: int = 300):
         ds = LaplacePDEDataset("/data/test_in.npz", regime=regime)
         if max_samples and max_samples < len(ds):
             ds = torch.utils.data.Subset(ds, range(max_samples))
-        print(f"  Using {len(ds)} samples, 20 samples each")
+        print(f"  Using {len(ds)} samples, {n_samples_generative} samples each")
         loader = torch.utils.data.DataLoader(ds, batch_size=32)
 
         t0 = time.time()
-        regime_results = evaluate_cfm_uq(cfm, loader, "cuda", n_samples=20)
+        regime_results = evaluate_cfm_uq(cfm, loader, "cuda", n_samples=n_samples_generative)
         elapsed = time.time() - t0
         total_time += elapsed
         print(f"  Completed {regime} in {elapsed:.1f}s")
@@ -252,15 +239,13 @@ def evaluate_fm_uq(max_samples: int = 300):
 
         results[regime] = regime_results
 
-        state = {"metrics": results, "eval_time_seconds": total_time}
-        with open(partial_path, "w") as f:
-            json.dump(state, f, indent=2)
+        _save_partial(partial_path, results, total_time, run_params)
         volume.commit()
         print(f"  Checkpoint saved ({len(results)}/{len(REGIMES)} regimes)")
 
     out_path = os.path.join(out_dir, "uq_results.json")
     with open(out_path, "w") as f:
-        json.dump({"metrics": results, "eval_time_seconds": total_time}, f, indent=2)
+        json.dump({"metrics": results, "eval_time_seconds": total_time, "run_params": run_params}, f, indent=2)
     volume.commit()
     print(f"\nAll done! Saved to {out_path}")
     return {"metrics": results, "eval_time_seconds": total_time}
@@ -272,7 +257,7 @@ def evaluate_fm_uq(max_samples: int = 300):
     timeout=3600 * 24,
     volumes={"/data": volume},
 )
-def evaluate_conformal(max_samples: int = 300):
+def evaluate_conformal(max_samples: int = 300, n_samples_generative: int = 5):
     """Evaluate conformal prediction on all models across all regimes.
 
     Splits max_samples into cal (first half) and test (second half).
@@ -299,16 +284,10 @@ def evaluate_conformal(max_samples: int = 300):
     os.makedirs(out_dir, exist_ok=True)
     partial_path = os.path.join(out_dir, "conformal_partial.json")
 
-    # Resume from partial if available
-    if os.path.exists(partial_path):
-        with open(partial_path) as f:
-            state = json.load(f)
-        results = state.get("results", {})
-        total_time = state.get("eval_time_seconds", 0.0)
+    run_params = {"max_samples": max_samples, "n_samples_generative": n_samples_generative}
+    results, total_time = _load_partial_with_validation(partial_path, run_params)
+    if results:
         print(f"Resuming: completed models = {list(results.keys())}")
-    else:
-        results = {}
-        total_time = 0.0
 
     if max_samples < 4:
         raise ValueError(f"max_samples must be >= 4 for meaningful cal/test split, got {max_samples}")
@@ -402,11 +381,11 @@ def evaluate_conformal(max_samples: int = 300):
             else:
                 print(f"  Collecting {model_name} predictions (cal, {n_cal} samples)...")
                 cal_mean, cal_std, cal_truth = collect_generative_predictions(
-                    model, cal_loader, "cuda", n_samples=20
+                    model, cal_loader, "cuda", n_samples=n_samples_generative
                 )
                 print(f"  Collecting {model_name} predictions (test, {n_test} samples)...")
                 test_mean, test_std, test_truth = collect_generative_predictions(
-                    model, test_loader, "cuda", n_samples=20
+                    model, test_loader, "cuda", n_samples=n_samples_generative
                 )
 
             # Run conformal evaluation
@@ -424,9 +403,7 @@ def evaluate_conformal(max_samples: int = 300):
             # Per-regime checkpoint for slow models (DDPM)
             if model_name == "ddpm_improved":
                 results[partial_key] = model_results
-                state = {"results": results, "eval_time_seconds": total_time}
-                with open(partial_path, "w") as f:
-                    json.dump(state, f, indent=2)
+                _save_partial(partial_path, results, total_time, run_params)
                 volume.commit()
                 print(f"  Regime checkpoint saved ({len(model_results)}/{len(REGIMES)})")
 
@@ -439,16 +416,14 @@ def evaluate_conformal(max_samples: int = 300):
         results[model_name] = model_results
 
         # Checkpoint after each model
-        state = {"results": results, "eval_time_seconds": total_time}
-        with open(partial_path, "w") as f:
-            json.dump(state, f, indent=2)
+        _save_partial(partial_path, results, total_time, run_params)
         volume.commit()
         print(f"  Checkpoint saved ({len(results)}/3 models)")
 
     # Write final results
     out_path = os.path.join(out_dir, "conformal_results.json")
     with open(out_path, "w") as f:
-        json.dump({"results": results, "eval_time_seconds": total_time}, f, indent=2)
+        json.dump({"results": results, "eval_time_seconds": total_time, "run_params": run_params}, f, indent=2)
     volume.commit()
     print(f"\nAll done! Saved to {out_path}")
     return {"results": results, "eval_time_seconds": total_time}
@@ -553,7 +528,7 @@ def generate_fig5_data(test_indices=(0, 100, 200)):
     timeout=3600 * 24,
     volumes={"/data": volume},
 )
-def evaluate_ood(max_samples: int = 300):
+def evaluate_ood(max_samples: int = 300, n_samples_generative: int = 5):
     """Evaluate all models on held-out piecewise BC family (test_ood.npz).
 
     Runs deterministic models (regressor, FNO) + generative models (ensemble, FM, DDPM)
@@ -578,7 +553,7 @@ def evaluate_ood(max_samples: int = 300):
     os.makedirs(out_dir, exist_ok=True)
     partial_path = os.path.join(out_dir, "ood_partial.json")
 
-    run_params = {"max_samples": max_samples, "dataset": "test_ood.npz", "regime": "exact", "eval_version": 2}
+    run_params = {"max_samples": max_samples, "dataset": "test_ood.npz", "regime": "exact", "eval_version": 2, "n_samples_generative": n_samples_generative}
     results, total_time = _load_partial_with_validation(partial_path, run_params)
     if results:
         print(f"Resuming: {list(results.keys())}")
@@ -656,7 +631,7 @@ def evaluate_ood(max_samples: int = 300):
         ckpt = torch.load("/data/experiments/flow_matching/best.pt", map_location="cuda")
         cfm.load_state_dict(ckpt["model_state_dict"])
         cfm.eval()
-        results["flow_matching"] = evaluate_cfm_uq(cfm, loader, "cuda", n_samples=20)
+        results["flow_matching"] = evaluate_cfm_uq(cfm, loader, "cuda", n_samples=n_samples_generative)
         elapsed = time.time() - t0
         total_time += elapsed
         print(f"  Done in {elapsed:.1f}s")
@@ -673,7 +648,7 @@ def evaluate_ood(max_samples: int = 300):
         ckpt = torch.load("/data/experiments/ddpm_improved/best.pt", map_location="cuda")
         ddpm.load_state_dict(ckpt["model_state_dict"])
         ddpm.eval()
-        results["ddpm_improved"] = evaluate_ddpm_uq(ddpm, loader, "cuda", n_samples=20)
+        results["ddpm_improved"] = evaluate_ddpm_uq(ddpm, loader, "cuda", n_samples=n_samples_generative)
         elapsed = time.time() - t0
         total_time += elapsed
         print(f"  Done in {elapsed:.1f}s")
@@ -982,7 +957,7 @@ def evaluate_ddpm_phase1(max_samples: int = 300, n_samples: int = 5):
     timeout=3600 * 24,
     volumes={"/data": volume},
 )
-def evaluate_ood_all_regimes(max_samples: int = 150):
+def evaluate_ood_all_regimes(max_samples: int = 150, n_samples_generative: int = 5):
     """Evaluate generative models on OOD piecewise BCs across all 5 observation regimes.
 
     Tests whether the OOD generalization gap widens or narrows under observation uncertainty.
@@ -1007,7 +982,7 @@ def evaluate_ood_all_regimes(max_samples: int = 150):
     os.makedirs(out_dir, exist_ok=True)
     partial_path = os.path.join(out_dir, "ood_regimes_partial.json")
 
-    n_uq_samples = 20
+    n_uq_samples = n_samples_generative
     run_params = {
         "max_samples": max_samples,
         "dataset": "test_ood.npz",
@@ -1151,26 +1126,26 @@ def diagnose_ddpm():
 
 
 @app.local_entrypoint()
-def main(eval_type: str, max_samples: int = 300, fresh: bool = False):
+def main(eval_type: str, max_samples: int = 300, fresh: bool = False, n_samples_generative: int = 5):
     if eval_type == "phase1":
         evaluate_phase1.remote()
     elif eval_type == "ensemble-uq":
-        evaluate_ensemble_uq.remote()
+        evaluate_ensemble_uq.remote(n_samples_generative=n_samples_generative)
     elif eval_type == "ddpm-uq":
         if fresh:
             _clear_partial("experiments/ddpm_improved/uq_partial.json")
-        evaluate_ddpm_uq.remote(max_samples=max_samples)
+        evaluate_ddpm_uq.remote(max_samples=max_samples, n_samples_generative=n_samples_generative)
     elif eval_type == "fm-uq":
         if fresh:
             _clear_partial("experiments/flow_matching/uq_partial.json")
-        evaluate_fm_uq.remote(max_samples=max_samples)
+        evaluate_fm_uq.remote(max_samples=max_samples, n_samples_generative=n_samples_generative)
     elif eval_type == "phase2-all":
         if fresh:
             _clear_partial("experiments/ddpm_improved/uq_partial.json")
             _clear_partial("experiments/flow_matching/uq_partial.json")
-        h1 = evaluate_ensemble_uq.spawn()
-        h2 = evaluate_ddpm_uq.spawn(max_samples=max_samples)
-        h3 = evaluate_fm_uq.spawn(max_samples=max_samples)
+        h1 = evaluate_ensemble_uq.spawn(n_samples_generative=n_samples_generative)
+        h2 = evaluate_ddpm_uq.spawn(max_samples=max_samples, n_samples_generative=n_samples_generative)
+        h3 = evaluate_fm_uq.spawn(max_samples=max_samples, n_samples_generative=n_samples_generative)
         h1.get()
         h2.get()
         h3.get()
@@ -1182,11 +1157,11 @@ def main(eval_type: str, max_samples: int = 300, fresh: bool = False):
     elif eval_type == "ood":
         if fresh:
             _clear_partial("experiments/ood/ood_partial.json")
-        evaluate_ood.remote(max_samples=max_samples)
+        evaluate_ood.remote(max_samples=max_samples, n_samples_generative=n_samples_generative)
     elif eval_type == "conformal":
         if fresh:
             _clear_partial("experiments/conformal/conformal_partial.json")
-        evaluate_conformal.remote(max_samples=max_samples)
+        evaluate_conformal.remote(max_samples=max_samples, n_samples_generative=n_samples_generative)
     elif eval_type == "fig5":
         generate_fig5_data.remote()
     elif eval_type == "ddpm-phase1":
@@ -1194,7 +1169,7 @@ def main(eval_type: str, max_samples: int = 300, fresh: bool = False):
     elif eval_type == "ood-regimes":
         if fresh:
             _clear_partial("experiments/ood_regimes/ood_regimes_partial.json")
-        evaluate_ood_all_regimes.remote(max_samples=max_samples)
+        evaluate_ood_all_regimes.remote(max_samples=max_samples, n_samples_generative=n_samples_generative)
     elif eval_type == "diagnose":
         diagnose_ddpm.remote()
     else:
