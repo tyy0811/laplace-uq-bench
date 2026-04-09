@@ -1,5 +1,31 @@
 # Design Decisions
 
+## Matched K=5 as Primary Comparison (Phase B, April 2026)
+
+### Decision: All pixel-level UQ comparisons use matched K=5 samples
+
+### Context
+
+The original benchmark used K=20 samples for generative models (FM, DDPM) vs K=5 ensemble members for pixel-level coverage and interval width metrics. This gave generative models a statistical advantage in mean/std estimation. Functional CRPS (§11.3) already used matched K=5.
+
+### Why matched K=5
+
+The ensemble has exactly 5 members — that's a fixed architectural constraint, not a tunable parameter. Comparing K=20 generative vs K=5 ensemble conflates "generative models are better calibrated" with "more samples give better quantile estimates." The matched comparison isolates the former.
+
+### Why Option B reporting (matched headline, K=20 in appendix)
+
+Three options were considered: (A) matched only, (B) matched primary with K=20 secondary, (C) side-by-side. Option B preserves the information that generative models do improve with more samples (relevant for practitioners with compute budget) while keeping the headline comparison honest. The K=20 numbers are in Appendix Table A1 of benchmark_results.md.
+
+### Why parameterize via Modal entrypoint argument (Option C)
+
+The `n_samples_generative` parameter is threaded from `main()` through all `.spawn()`/`.remote()` calls. This allows reproducing K=20 numbers with a single flag (`--n-samples-generative 20`) without code changes. Alternative approaches (hardcoding, module-level constant) were rejected because they require editing code to switch between matched and unmatched comparisons.
+
+### Why checkpoint validation with run_params
+
+After parameterizing sample counts, stale K=20 partial checkpoints on the Modal volume could silently merge with new K=5 results during resume. All evaluation functions now save `n_samples_generative` in their checkpoint metadata and validate on resume via `_load_partial_with_validation`. Incompatible partials raise `ValueError` with "Use --fresh to start over."
+
+---
+
 ## DPS Guidance Configuration (Phase C, April 2026)
 
 ### Decision: zeta_obs=100, zeta_pde=0, no gradient clipping

@@ -942,7 +942,35 @@ The key advantage of DPS over conditional models: **a single unconditional model
 
 **Theoretical status.** The original DPS paper (Chung et al., ICLR 2023) provides no formal convergence guarantees — the Tweedie approximation (10.3) is justified empirically. For related unconditional-prior inverse-problem theory, Xu & Chi (NeurIPS 2024) introduced the DPnP framework — a different algorithm that alternates between a proximal consistency sampler and a denoising diffusion sampler — and proved asymptotic consistency under exact scores and diminishing step sizes (their Theorem 1), with non-asymptotic error bounds showing convergence to a distorted posterior $\pi_\eta$ with total variation error $O(\eta + \epsilon_{\text{score}} + \epsilon_{\text{solver}})$ (their Theorem 2). These results do not directly apply to the DPS update rule (10.5), but they establish that provably convergent posterior sampling with unconditional diffusion priors is achievable in principle.
 
-*DPS is a stretch goal. If implemented, the unconditional flow matching model uses `model/unet.py` with `in_channels=1` (no conditioning). The guidance sampler is in `model/dps_sampler.py`. Tested in `tests/test_dps.py`.*
+*DPS is implemented in `src/diffphys/model/dps_sampler.py` using a trained unconditional DDPM prior (`src/diffphys/model/unconditional_ddpm.py`, `in_channels=1`). Tested in `tests/test_dps.py` and `tests/test_unconditional_ddpm.py`.*
+
+### 10.5 Empirical Outcome
+
+DPS at K=5 demonstrates a clean tradeoff: a ~30$\times$ accuracy cost in-distribution is exchanged for robustness to observation patterns the conditional model has never seen. On in-distribution regimes, DPS reaches the observation noise floor (obs RMSE within 5% of $\sigma_{\text{obs}}$ across 19/20 sparse-noisy examples) while underperforming the conditional DDPM by approximately 30$\times$ on relative $L^2$ error (median 0.056 vs ~0.002 on sparse-noisy). The conditional model's advantage on familiar observation patterns reflects its training-time exposure to the exact observation operator.
+
+**Noise floor saturation.** DPS saturates the observation noise floor universally, not just on one regime. On dense-noisy (obs RMSE 0.103, $\sigma = 0.1$, ratio 1.03), sparse-noisy (0.095, ratio 0.95), and very-sparse (0.145, $\sigma \approx 0.15$, ratio $\approx 1.0$), the observation-space residual matches $\sigma_{\text{obs}}$ within statistical uncertainty. On clean regimes (exact, sparse-clean), the obs RMSE of 0.032 represents the residual measurement-discretization error. DPS has fully exhausted the information content of the measurements in every case.
+
+**Physics compliance is regime-invariant.** DPS PDE residual spans [4.33, 4.37] across all 5 in-distribution regimes. Because the physics structure comes entirely from the unconditional prior (not from the observation model), PDE compliance is independent of observation quality.
+
+**Coverage tracks information-theoretic uncertainty.** Coverage at 90% nominal degrades from 96.4% (exact, many high-quality observations) to 56.1% (very-sparse, few noisy observations). This is not a calibration failure — at very-sparse observation density, the true posterior over compatible boundary completions is genuinely wide, and 5 samples may not span it well. The degradation from dense-noisy (93.7%) to sparse-noisy (86.3%) at identical noise levels but different observation counts confirms that coverage tracks the observation information content, not just noise level.
+
+**Guidance configuration.** Dual guidance (Eq. 10.5) was tuned over a $(\zeta_{\text{obs}}, \zeta_{\text{pde}})$ grid; the best setting had $\zeta_{\text{pde}} = 0$. Any nonzero physics weight ($\zeta_{\text{pde}} \in \{0.001, 0.01, 0.05\}$) caused sampling to diverge to NaN. This is a stronger statement than "physics guidance is unnecessary": on this benchmark, physics guidance is actively destabilizing. The discrete Laplacian gradient through the Tweedie denoised mean amplifies noise at intermediate diffusion steps, consistent with the Jensen's Gap caveat in §6.1. The unconditional prior alone encodes enough elliptic structure that explicit PDE-residual gradients become redundant and harmful. For problems where the prior is less well-matched to the PDE structure (e.g., turbulent flows, nonlinear PDEs), the physics term may become essential.
+
+### 10.6 Zero-Shot Adaptation
+
+Under zero-shot observation patterns, the in-distribution tradeoff reverses. Tested on three patterns outside the training distribution — extreme noise ($\sigma = 0.5$ vs training max 0.2), non-uniform per-edge sensor density (16/8/32/4 vs training uniform distribution), and single-edge observation (64 points on one edge, zero on the other three) — the conditional model exhibits two qualitatively different failure modes:
+
+**Within-manifold degradation.** Under extreme noise, the conditional model's PDE residual rises from 4.33 (in-distribution) to 6.84 (1.6$\times$), producing less accurate but still roughly harmonic solutions. DPS produces similar accuracy (rel $L^2$ 0.285 vs 0.298) but better physics compliance (4.62 vs 6.84). At $\sigma = 0.5$, the DPS obs RMSE of 0.424 corresponds to a ratio of 0.85$\sigma$ — below the noise floor, suggesting the prior provides implicit denoising at higher noise levels. Samples drift toward the prior mean when strict observation matching would be implausibly noisy.
+
+**Off-manifold collapse.** Under non-uniform sensor density, the conditional model's PDE residual rises from 4.33 to 934 — a 220$\times$ blowup indicating samples that no longer approximate Laplace solutions. DPS is unaffected (4.31, within statistical noise of its in-distribution value). On single-edge observation, the conditional model's PDE residual is 41.7 (10$\times$ blowup) while DPS remains at 4.26.
+
+The PDE residual separates the two failure modes more sharply than rel $L^2$. The non-uniform-sensor result is particularly striking: the conditional model has seen both $M=16$ and $M=8$ and $M=32$ and $M=4$ during training, just never in the joint configuration (16, 8, 32, 4) across the four edges. A 220$\times$ increase in PDE residual from this distributional shift suggests the conditional model's generalization is brittle to joint distributional shifts in the observation pattern, even when each marginal shift is in-distribution.
+
+Under single-edge observation, both methods exhibit high rel $L^2$ (0.926 conditional, 0.848 DPS) because the true posterior over compatible solutions is genuinely wide — one edge provides insufficient information to determine the field. The relevant metric here is not accuracy but physical plausibility: the conditional model's PDE residual of 41.7 indicates it produces solutions that are not approximately harmonic, while DPS at 4.26 produces samples that remain on the Laplace manifold even when the observations are insufficient to localize within it.
+
+DPS, because it accesses observations only through the forward operator $\mathcal{H}$ at inference time, does not encode any implicit joint distribution over per-edge configurations. Its physics compliance is regime-invariant: the PDE residual stays within [4.26, 4.64] across all in-distribution and zero-shot regimes tested. This is the core value proposition of observation-model independence: a single unconditional prior handles sensor configurations that conditional models cannot without retraining.
+
+*All DPS results are from a single training run of the unconditional prior and a single tuning pass for $(\zeta_{\text{obs}}, \zeta_{\text{pde}})$. No cross-seed variance is reported. The 30$\times$ in-distribution gap and zero-shot findings should be interpreted as achievable outcomes, not statistically guaranteed rankings.*
 
 ---
 
@@ -1306,9 +1334,14 @@ Reliability diagrams are computed separately for the ensemble, ensemble+conforma
 | §7.3 OT coupling | (7.7) | `model/flow_matching.py:OTCouplingMatcher` | Mini-batch optimal transport |
 | §8.1–8.4 Improved DDPM | (8.1)–(8.4) | `model/diffusion.py` (cosine schedule, v-pred, Min-SNR) | Improved DDPM comparison point |
 | §9.1–9.2 Conformal prediction | (9.1)–(9.6) | `evaluation/conformal.py`, `experiments/evaluate_conformal.py` | Post-hoc coverage calibration for field uncertainty |
-| §10.1–10.3 DPS (stretch) | (10.1)–(10.6) | `model/dps_sampler.py` (if implemented) | Unconditional prior + guidance |
+| §10.1 Inverse problem formulation | (10.1)–(10.2) | `src/diffphys/model/dps_sampler.py:DPSSampler.sample()`, `tests/test_dps.py` | Bayes decomposition of posterior; prior $\times$ likelihood split |
+| §10.2 Tweedie-based DPS approximation | (10.3)–(10.4) | `src/diffphys/model/dps_sampler.py:DPSSampler._dps_step()` | Posterior score approximation via denoised-mean point estimate |
+| §10.3 Dual guidance (measurement + physics) | (10.5) | `src/diffphys/model/dps_sampler.py:DPSSampler._dps_step()` + `_laplacian_loss()`; tuning results in `results/dps/tuning_*.json`, `results/dps/preflight_results.json` | $(\zeta_{\text{obs}}, \zeta_{\text{pde}}) = (100, 0)$; NaN divergence on all nonzero $\zeta_{\text{pde}}$ |
+| §10.4 Unconditional prior training | — | `src/diffphys/model/unconditional_ddpm.py:UnconditionalDDPM`, `modal_deploy/train_remote.py` | Single unconditional prior enables observation-model independence |
+| §10.5 In-distribution DPS evaluation | — | `modal_deploy/dps_experiments.py::evaluate_dps`; `results/dps/eval_results.json`, `results/dps/eval_per_example.json` | Noise floor saturation, 30$\times$ accuracy gap, regime-invariant physics compliance |
+| §10.6 Zero-shot adaptation evaluation | — | `modal_deploy/dps_zero_shot.py::run_zero_shot`; `results/dps_zero_shot/zero_shot_results.json` | Within-manifold degradation vs off-manifold collapse; 220$\times$ PDE residual blowup on non-uniform sensors |
 
-**Orphan check:** All core mathematical components (PDE theory, model architectures, diffusion theory, evaluation metrics) map to at least one deliverable. Orchestration, configuration, and figure-generation utilities (`experiments/run_all.py`, `experiments/generate_figures.py`, `configs/`) are omitted from this table as they do not implement mathematical content. Training scripts for individual models (`experiments/train_*.py`) and the integration test are included above for completeness but are wrappers around the core `src/diffphys/` modules.
+**Orphan check:** All core mathematical components (PDE theory, model architectures, diffusion theory, evaluation metrics) map to at least one deliverable. §10 (DPS) is fully implemented and evaluated; the aspirational "if implemented" language in the previous revision has been replaced with specific repository deliverables and result artifact references. Tuning, smoke-test, and pre-flight result files are included alongside the main evaluation artifacts because the hyperparameter selection itself is a finding (§10.3, NaN divergence on all nonzero $\zeta_{\text{pde}}$). Orchestration, configuration, and figure-generation utilities (`experiments/run_all.py`, `experiments/generate_figures.py`, `configs/`) are omitted from this table as they do not implement mathematical content. Training scripts for individual models and the integration test are included above for completeness but are wrappers around the core `src/diffphys/` modules.
 
 ### 13.1 Evidence Mapping: Empirical Claims to Result Artifacts
 
@@ -1326,6 +1359,21 @@ Major empirical claims made in the theory document are traceable to the followin
 | FNO underperforms U-Net by ~40× on rel. L2 (§3.2) | `docs/benchmark_results.md` Table 1 | `modal_deploy/evaluate_remote.py --eval-type phase1` |
 | OOD: DDPM shows lower calibration error than ensemble at matched K=5 across regimes | `docs/benchmark_results.md` Table 6 | `modal_deploy/evaluate_remote.py --eval-type ood-regimes` |
 | Training convergence: FM vs improved DDPM (§8) | `figures/fig10_convergence.png` | `scripts/plot_figures.py` |
+| Dual guidance tuning identified $(\zeta_{\text{obs}}, \zeta_{\text{pde}}) = (100, 0)$ as the sole stable configuration (§10.3) | `results/dps/tuning_results.json` (Round 1), `results/dps/tuning_extended_results.json` (Round 2) | `modal_deploy/dps_experiments.py::tune_guidance`, `::tune_guidance_extended` |
+| All nonzero $\zeta_{\text{pde}}$ values ($\in \{0.001, 0.01, 0.05, 0.1, 1.0\}$) diverge to NaN (§10.3) | `results/dps/tuning_extended_results.json`, `results/dps/preflight_results.json` | `modal_deploy/dps_experiments.py::tune_guidance_extended`, `modal_deploy/dps_preflight.py::preflight` |
+| Pre-flight: median rel L2 = 0.061, IQR [0.051, 0.085]; obs RMSE/$\sigma_{\text{obs}}$ = 0.947 (§10.3) | `results/dps/preflight_results.json` | `modal_deploy/dps_preflight.py::preflight` |
+| DPS reaches observation noise floor across all noisy regimes: obs RMSE/σ ratios 1.03, 0.95, ~1.0 (§10.5) | `results/dps/eval_results.json`, `results/dps/eval_per_example.json` | `modal_deploy/dps_experiments.py::evaluate_dps` |
+| DPS underperforms conditional DDPM by ~30$\times$ in median rel L2 on sparse-noisy at matched K=5 (§10.5) | `results/dps/eval_results.json`, cross-ref `results/k5/` conditional DDPM results | `modal_deploy/dps_experiments.py::evaluate_dps` |
+| DPS PDE residual flat across all 5 in-distribution regimes: range [4.33, 4.37] (§10.5) | `results/dps/eval_results.json` | `modal_deploy/dps_experiments.py::evaluate_dps` |
+| DPS coverage degrades gracefully: 96.4% (exact) to 56.1% (very-sparse) at 90% nominal (§10.5) | `results/dps/eval_results.json` | `modal_deploy/dps_experiments.py::evaluate_dps` |
+| Extreme noise ($\sigma = 0.5$): DPS rel L2 = 0.285, conditional = 0.298; DPS PDE residual = 4.62, conditional = 6.84 (§10.6) | `results/dps_zero_shot/zero_shot_results.json` | `modal_deploy/dps_zero_shot.py::run_zero_shot` |
+| Non-uniform sensors (16/8/32/4): DPS PDE residual = 4.31, conditional = 934 (220$\times$ blowup) (§10.6) | `results/dps_zero_shot/zero_shot_results.json` | `modal_deploy/dps_zero_shot.py::run_zero_shot` |
+| Single-edge: DPS PDE residual = 4.26, conditional = 41.7 (10$\times$ blowup) (§10.6) | `results/dps_zero_shot/zero_shot_results.json` | `modal_deploy/dps_zero_shot.py::run_zero_shot` |
+| DPS PDE residual [4.26, 4.64] across all in-dist + zero-shot; conditional spans [4.33, 934] (§10.6) | `results/dps/eval_results.json` + `results/dps_zero_shot/zero_shot_results.json` | Combined |
+| At $\sigma = 0.5$, DPS obs RMSE ratio = 0.85 — below noise floor, indicating prior denoising (§10.6) | `results/dps_zero_shot/zero_shot_results.json` | `modal_deploy/dps_zero_shot.py::run_zero_shot` |
+| All DPS results from single training run + single tuning pass (§10.5, §10.6) | N/A — scope statement | N/A |
+
+*Result artifact paths use local filesystem convention (`results/dps/...`). These are downloaded copies of the corresponding `/data/experiments/...` artifacts on the Modal volume used during evaluation.*
 
 All result numbers cited in the theory document are from single training runs (one checkpoint per model). See §16 closing note for replication scope.
 

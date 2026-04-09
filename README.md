@@ -9,10 +9,11 @@ We compare five neural surrogates for 2D Laplace equation solution fields: a det
 ### Summary of Findings
 
 - Under exact BCs, a Phase 2 DDPM 5-sample mean achieves 5x lower PDE residual than U-Net regression, but at 200x the inference cost — the FD solver remains faster and more accurate (caveat: DDPM was trained on mixed regimes, giving it an advantage on exact-BC test data)
-- Under sparse noisy observations, generative models maintain 84-97% raw coverage while the ensemble collapses to 15-31%
-- Conformal prediction lifts all methods to near-nominal 90% coverage, but DDPM produces intervals 2-3x tighter than the ensemble
+- Under sparse noisy observations at matched K=5, generative models maintain 77-95% raw coverage while the ensemble collapses to 15-31%
+- Conformal prediction lifts all methods to near-nominal 90% coverage, but DDPM produces intervals 1.2-6.6x tighter than the ensemble at matched sample count
 - In this benchmark, the training improvements (Min-SNR + cosine schedule + v-prediction) were more impactful than the choice of generative framework — improved DDPM outperforms flow matching on functional CRPS despite FM's simpler training objective
 - On held-out piecewise BCs, all models degrade but DDPM maintains the lowest calibration error (vs. ensemble) across all 5 observation regimes, suggesting but not proving that the generative prior captures transferable solution structure
+- **New (v3):** Diffusion posterior sampling (DPS) with an unconditional prior reaches the observation noise floor in-distribution (obs RMSE within 5% of sigma) while paying a ~30x accuracy cost vs conditional DDPM. On zero-shot observation patterns, DPS is unaffected (PDE residual [4.26, 4.64]) while the conditional model collapses (PDE residual up to 934 on non-uniform sensors). See §10 of [Theoretical_Framework.pdf](Theoretical_Framework.pdf)
 
 ---
 

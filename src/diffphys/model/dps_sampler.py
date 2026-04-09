@@ -25,11 +25,13 @@ class DPSSampler:
     """
 
     def __init__(self, model, zeta_obs=1.0, zeta_pde=0.1,
-                 guidance_schedule: Optional[Callable] = None):
+                 guidance_schedule: Optional[Callable] = None,
+                 grad_clip: Optional[float] = 1.0):
         self.model = model
         self.zeta_obs = zeta_obs
         self.zeta_pde = zeta_pde
         self.guidance_schedule = guidance_schedule or self._default_schedule
+        self.grad_clip = grad_clip
 
     def sample(self, y_obs: torch.Tensor, obs_operator: Callable,
                n_samples: int = 5, H: int = 64, W: int = 64
@@ -108,9 +110,10 @@ class DPSSampler:
         guidance = torch.autograd.grad(total_loss, x_t)[0]
 
         # Clip gradient norm to prevent divergence
-        grad_norm = guidance.norm()
-        if grad_norm > 1.0:
-            guidance = guidance / grad_norm
+        if self.grad_clip is not None:
+            grad_norm = guidance.norm()
+            if grad_norm > self.grad_clip:
+                guidance = guidance * (self.grad_clip / grad_norm)
 
         # Standard DDPM reverse step minus guidance
         with torch.no_grad():
