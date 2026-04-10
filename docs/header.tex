@@ -1,0 +1,17 @@
+% Allow line breaks in inline code (\texttt)
+\usepackage{xurl}
+\makeatletter
+\let\oldtexttt\texttt
+\renewcommand{\texttt}[1]{%
+  \begingroup
+  \ttfamily
+  \hyphenchar\font=`\/%
+  \oldtexttt{#1}%
+  \endgroup
+}
+\makeatother
+
+% Prevent overfull hboxes globally
+\tolerance=1000
+\emergencystretch=3em
+\setlength{\parfillskip}{0pt plus 1fil}

@@ -7,11 +7,11 @@ Usage:
 
     python scripts/evaluate_phase2.py --model-type ddpm \
         --config configs/ddpm_improved.yaml \
-        --checkpoints experiments/ddpm_improved/best.pt --n-samples 20
+        --checkpoints experiments/ddpm_improved/best.pt --n-samples 5
 
     python scripts/evaluate_phase2.py --model-type flow_matching \
         --config configs/flow_matching.yaml \
-        --checkpoints experiments/flow_matching/best.pt --n-samples 20
+        --checkpoints experiments/flow_matching/best.pt --n-samples 5
 """
 
 import argparse
@@ -27,8 +27,8 @@ def main():
     parser.add_argument("--checkpoints", nargs="+", required=True)
     parser.add_argument("--test-npz", default="data/test_in.npz")
     parser.add_argument("--device", default="cpu")
-    parser.add_argument("--n-samples", type=int, default=20,
-                        help="Samples per input for generative models (default: 20)")
+    parser.add_argument("--n-samples", type=int, default=5,
+                        help="Samples per input for generative models (default: 5, matched to ensemble)")
     parser.add_argument("--output", default=None)
     args = parser.parse_args()
 

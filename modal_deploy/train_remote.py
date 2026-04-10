@@ -42,13 +42,15 @@ def _rewrite_paths(config):
 )
 def train_model(config_path: str):
     import torch
-    from diffphys.model.trainer import load_config, train, train_ddpm, train_cfm
+    from diffphys.model.trainer import load_config, train, train_ddpm, train_cfm, train_unconditional_ddpm
 
     config = _rewrite_paths(load_config(config_path))
     device = "cuda" if torch.cuda.is_available() else "cpu"
     commit = volume.commit
 
-    if "ddpm" in config:
+    if config.get("unconditional"):
+        train_unconditional_ddpm(config, device=device, commit_fn=commit)
+    elif "ddpm" in config:
         train_ddpm(config, device=device, commit_fn=commit)
     elif "flow_matching" in config:
         train_cfm(config, device=device, commit_fn=commit)
