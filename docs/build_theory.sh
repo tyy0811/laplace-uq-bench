@@ -10,7 +10,12 @@ REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 pandoc "$SCRIPT_DIR/theory.md" \
     -o "$REPO_ROOT/Theoretical_Framework.pdf" \
     --pdf-engine=xelatex \
-    --variable=geometry:margin=1in \
-    --variable=fontsize=11pt
+    --variable=fontsize:12pt \
+    --variable=geometry:"margin=1in" \
+    -V mainfont="Times New Roman" \
+    -V mathfont="STIX Two Math" \
+    -V monofont="Courier New" \
+    -V monofontoptions="Scale=MatchLowercase" \
+    -H "$SCRIPT_DIR/header.tex"
 
 echo "Built Theoretical_Framework.pdf"
