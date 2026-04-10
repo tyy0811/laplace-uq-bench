@@ -1,10 +1,10 @@
-# Uncertainty Quantification for PDE Surrogates: Deep Ensembles, Flow Matching, Improved DDPM, and Conformal Prediction
+# Uncertainty Quantification for PDE Surrogates: Deep Ensembles, Flow Matching, Improved DDPM, Conformal Prediction, and Diffusion Posterior Sampling
 
 ## Overview
 
 Neural surrogates can approximate PDE solutions orders of magnitude faster than traditional solvers. But when boundary conditions are uncertain — noisy sensors, sparse measurements — a point prediction isn't enough. You need calibrated uncertainty over the solution field. This project benchmarks how well different approaches capture that uncertainty and whether their confidence estimates can be trusted.
 
-We compare five neural surrogates for 2D Laplace equation solution fields: a deterministic U-Net regressor, an FNO baseline, a deep ensemble (5 U-Nets), conditional flow matching (OT-CFM), and an improved DDPM — each wrapped with split conformal prediction for distribution-free coverage guarantees. The benchmark spans five observation regimes (exact, dense-noisy, sparse-clean, sparse-noisy, very-sparse) and a held-out boundary condition family (piecewise constant).
+We compare six neural surrogates for 2D Laplace equation solution fields: a deterministic U-Net regressor, an FNO baseline, a deep ensemble (5 U-Nets), conditional flow matching (OT-CFM), an improved DDPM, and diffusion posterior sampling (DPS) with an unconditional prior — each wrapped with split conformal prediction for distribution-free coverage guarantees. The benchmark spans five observation regimes (exact, dense-noisy, sparse-clean, sparse-noisy, very-sparse) and a held-out boundary condition family (piecewise constant).
 
 ### Summary of Findings
 
@@ -82,6 +82,8 @@ Note: FM calibration error is not reported in this table; the claim that DDPM ha
 
 **Improved DDPM.** Standard DDPM trained for 60 epochs achieved only 16.8% raw coverage due to undertraining — the loss was still decreasing but the model hadn't learned the full noise-level spectrum. Three targeted fixes solved this: cosine noise schedule (better noise distribution for 64x64 data), v-prediction parameterization (numerically stable across all noise levels), and Min-SNR-gamma weighting (3.4x convergence speedup by rebalancing the loss across timesteps). These compound to give 85-99% raw coverage at the same 80-epoch training budget.
 
+**Diffusion Posterior Sampling (DPS).** Uses an unconditional DDPM prior trained on clean Laplace solutions (no boundary conditioning) combined with gradient guidance at inference time to incorporate observations. The key advantage: a single unconditional model handles any observation pattern without retraining — if the sensor layout changes, only the forward operator in the guidance term changes. On in-distribution regimes, DPS pays a ~30x accuracy cost vs conditional DDPM but reaches the observation noise floor (obs RMSE within 5% of sigma_obs). On zero-shot observation patterns (non-uniform sensors, single-edge observation, extreme noise), DPS is unaffected (PDE residual [4.26, 4.64]) while the conditional model collapses (PDE residual up to 934). See [DECISIONS.md](DECISIONS.md) for guidance tuning analysis.
+
 **Conformal Prediction.** A post-hoc calibration wrapper that uses held-out calibration data to compute a nonconformity quantile scaling prediction intervals for finite-sample coverage guarantees. Both spatial (simultaneous coverage over the full field) and pixelwise (marginal per-pixel) variants are implemented. The key result: conformal calibration makes all methods achieve near-nominal coverage, but cannot fix the underlying sharpness — the raw uncertainty quality determines interval width.
 
 **Architecture.** The regressor, DDPM, and flow matching all share the same ConditionalUNet backbone (~5M parameters). The only difference is the training objective (MSE, noise/v-prediction, velocity prediction) and the sampling procedure (single forward pass, 200-step SDE, 50-step ODE). This isolates the contribution of the generative framework from the architecture.
@@ -112,16 +114,16 @@ Note: FM calibration error is not reported in this table; the claim that DDPM ha
 
 ```
 src/diffphys/
-  model/         - U-Net, DDPM, Flow Matching, Ensemble, FNO
+  model/         - U-Net, DDPM, Flow Matching, Ensemble, FNO, DPS, Unconditional DDPM
   evaluation/    - UQ metrics, conformal prediction, functionals
   data/          - Dataset, observation regimes
   pde/           - Laplace solver, boundary condition generation
 configs/         - YAML configs for all models
 scripts/         - Training, evaluation, plotting
-modal_deploy/    - Remote GPU training and evaluation on Modal
+modal_deploy/    - Remote GPU training/evaluation on Modal (incl. DPS experiments)
 experiments/     - Checkpoints and results
 figures/         - Generated plots
-tests/           - 209 unit tests across 19 test files
+tests/           - 224 unit tests across 21 test files
 docs/            - Technical documentation and theory
 ```
 
@@ -157,9 +159,15 @@ modal run modal_deploy/evaluate_remote.py --eval-type functional-crps
 
 # DDPM accuracy on Phase 1 exact BCs
 modal run modal_deploy/evaluate_remote.py --eval-type ddpm-phase1
+
+# DPS: train unconditional prior, run guidance tuning, evaluate zero-shot
+modal run modal_deploy/train_remote.py --config configs/unconditional_ddpm.yaml
+modal run modal_deploy/dps_preflight.py
+modal run modal_deploy/dps_experiments.py
+modal run modal_deploy/dps_zero_shot.py
 ```
 
-Training runs on Modal T4 GPUs with checkpoints saved every 20 epochs to a persistent volume. Evaluation uses 300 samples for in-distribution tests (from 5,000 available) and 150 for OOD (from 1,000 held-out piecewise BCs). See [computational cost breakdown](docs/benchmark_results.md#table-7-computational-cost) for per-model training times.
+Training runs on Modal T4 GPUs with checkpoints saved every 20 epochs to a persistent volume. Evaluation uses 300 samples for in-distribution tests (from 5,000 available) and 150 for OOD (from 1,000 held-out piecewise BCs). See [computational cost breakdown](docs/benchmark_results.md#table-8-computational-cost) for per-model training times.
 
 ## References
 
@@ -171,3 +179,5 @@ Training runs on Modal T4 GPUs with checkpoints saved every 20 epochs to a persi
 6. Nichol, A. & Dhariwal, P. (2021). Improved Denoising Diffusion Probabilistic Models. *ICML*.
 7. Salimans, T. & Ho, J. (2022). Progressive Distillation for Fast Sampling of Diffusion Models. *ICLR*.
 8. Hang, T. et al. (2023). Efficient Diffusion Training via Min-SNR Weighting Strategy. *ICCV*.
+9. Chung, H. et al. (2023). Diffusion Posterior Sampling for General Noisy Inverse Problems. *ICLR*.
+10. Huang, J. et al. (2024). DiffusionPDE: Generative PDE-Solving Under Partial Observation. *NeurIPS*.
