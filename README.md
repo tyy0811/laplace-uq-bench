@@ -40,17 +40,17 @@ On OOD piecewise BCs, the same DDPM has the lowest PDE residual (4.68) but highe
 
 | Regime | Ens raw@90 | FM raw@90 | DDPM raw@90 | Ens width | FM width | DDPM width | DDPM func. CRPS† |
 |--------|-----------|----------|------------|----------|---------|-----------|-----------------|
-| exact | 81.5% | 96.5% | 99.6% | 0.031 | 0.034 | **0.003** | — |
-| dense-noisy | 54.6% | 87.7% | 87.8% | 0.072 | 0.070 | **0.044** | — |
-| sparse-clean | 80.9% | 98.1% | 99.4% | 0.033 | 0.049 | **0.003** | — |
-| sparse-noisy | 31.2% | 89.4% | 85.4% | 0.135 | 0.131 | **0.088** | **0.0077** |
-| very-sparse | 15.4% | 83.8% | 83.7% | 0.376 | 0.331 | **0.248** | — |
+| exact | 81.5% | 87.8% | 94.7% | 0.031 | 0.042 | **0.005** | — |
+| dense-noisy | 55.1% | 78.5% | 76.3% | 0.074 | 0.090 | **0.053** | — |
+| sparse-clean | 80.9% | 89.3% | 94.2% | 0.033 | 0.057 | **0.005** | — |
+| sparse-noisy | 31.4% | 78.8% | 79.0% | 0.133 | 0.156 | **0.115** | **0.0077** |
+| very-sparse | 14.6% | 76.8% | 77.5% | 0.380 | 0.420 | **0.311** | — |
 
 †Center-T CRPS at matched 5v5 (sparse-noisy only). DDPM wins all 5 functionals; full CRPS table in [benchmark_results.md](docs/benchmark_results.md).
 
-All coverage and interval width values use pixelwise (marginal) conformal prediction, not the spatial/simultaneous variant. Generative models use 20 samples for mean/std estimation; the ensemble uses 5 members. These are not matched-sample comparisons — see Table 4 / functional CRPS for a matched 5v5 evaluation.
+All values use matched K=5 samples across all methods. K=20 generative results are in Appendix Table A1 of [benchmark_results.md](docs/benchmark_results.md).
 
-After conformal calibration, all methods achieve near-nominal 90% coverage. But DDPM consistently produces the tightest intervals — 2-3x sharper than ensemble — indicating the best-calibrated raw uncertainty. Ensemble raw coverage degrades severely under noise (81% → 15%), while generative models maintain 84-97%.
+After conformal calibration, all methods achieve near-nominal 90% coverage. But DDPM consistently produces the tightest intervals — 1.2-6.8x sharper than ensemble at matched sample count — indicating the best-calibrated raw uncertainty. Ensemble raw coverage degrades severely under noise (81% → 15%), while generative models maintain 77-95%.
 
 ![Prediction comparison across models under sparse-noisy observations](figures/fig5_comparison.png)
 *Ground truth, deterministic prediction, and generative samples with uncertainty maps for a sparse-noisy test case. DDPM produces sharper uncertainty concentrated at the boundaries where observations are missing.*
@@ -59,18 +59,18 @@ After conformal calibration, all methods achieve near-nominal 90% coverage. But 
 
 | Regime | Ens cov@90 | FM cov@90 | DDPM cov@90 | Ens CRPS (↓) | DDPM CRPS (↓) | Ens cal err (↓) | DDPM cal err (↓) |
 |--------|-----------|----------|------------|-------------|--------------|----------------|-----------------|
-| exact | 65.2% | 80.1% | 86.0% | **0.013** | 0.014 | 0.171 | **0.055** |
-| dense-noisy | 54.2% | 74.8% | 74.1% | **0.017** | 0.018 | 0.235 | **0.110** |
-| sparse-clean | 61.8% | 85.1% | 87.0% | **0.015** | 0.021 | 0.188 | **0.047** |
-| sparse-noisy | 39.0% | 76.9% | 77.0% | **0.026** | 0.028 | 0.315 | **0.084** |
-| very-sparse | 16.4% | 76.2% | 73.7% | 0.068 | **0.066** | 0.425 | **0.122** |
+| exact | 65.4% | 72.5% | 79.9% | **0.013** | 0.015 | 0.165 | **0.029** |
+| dense-noisy | 55.1% | 69.7% | 69.1% | **0.017** | 0.018 | 0.227 | **0.131** |
+| sparse-clean | 61.8% | 77.1% | 81.4% | **0.015** | 0.022 | 0.188 | **0.027** |
+| sparse-noisy | 38.9% | 70.9% | 68.3% | **0.026** | 0.030 | 0.314 | **0.143** |
+| very-sparse | 16.0% | 68.5% | 66.4% | 0.068 | **0.071** | 0.427 | **0.157** |
 
-The generalization gap **widens under observation uncertainty**: ensemble coverage drops from 65% to 16% across regimes, while generative models hold 74-87%. Ensemble CRPS is lowest on 4 of 5 regimes because its predictions are accurate on average, but its uncertainty is too narrow — producing tight intervals that frequently miss the ground truth. DDPM's slightly higher CRPS reflects wider intervals that actually contain the truth. At very-sparse, where the observation gap is largest, DDPM overtakes ensemble on CRPS as well.
+All OOD values use matched K=5 samples. The generalization gap **widens under observation uncertainty**: ensemble coverage drops from 65% to 16% across regimes, while generative models hold 66-81%. Ensemble CRPS is lowest on 4 of 5 regimes because its predictions are accurate on average, but its uncertainty is too narrow — producing tight intervals that frequently miss the ground truth. DDPM's slightly higher CRPS reflects wider intervals that actually contain the truth. At very-sparse, where the observation gap is largest, DDPM overtakes ensemble on CRPS as well.
 
 Note: FM calibration error is not reported in this table; the claim that DDPM has the lowest calibration error is relative to the ensemble only.
 
 ![Conformal calibration curves](figures/fig9_conformal_calibration.png)
-*Raw coverage (dashed) vs conformalized coverage (solid) at 50/90/95% targets, averaged across regimes. Conformal prediction lifts all methods to the diagonal, but the raw gap shows how much correction each method needs — DDPM starts closest to nominal.*
+*Raw coverage (dashed) vs conformalized coverage (solid) at 50/90/95% targets, averaged across regimes. Conformal prediction lifts all methods to the diagonal, but the raw gap shows how much correction each method needs — both generative models start much closer to nominal than the ensemble.*
 
 ---
 
@@ -98,7 +98,7 @@ Note: FM calibration error is not reported in this table; the claim that DDPM ha
 
 **All posterior evaluations are with respect to a synthetic prior.** The uncertainty reflects what is unknown given noisy/sparse boundary observations under the specific prior over boundary profiles defined by the dataset generator and the observation-noise model. This is not a general-purpose physics uncertainty estimate. The "noisy observations" setup is synthetic — a controlled study of posterior inference, not a claim about deployment.
 
-**Sample count fairness.** Functional-level CRPS (5 derived quantities) uses matched sample counts: 5 ensemble members vs 5 generated fields. This is the primary comparison. Pixel-level UQ metrics use 20 samples for generative model mean/std estimation, giving them a statistical advantage over the ensemble's 5 members. A matched pixel-level comparison at 5 samples, and a secondary comparison at 10 DDPM samples, are pending.
+**Sample count fairness.** All pixel-level and functional UQ comparisons use matched K=5 samples across methods (5 ensemble members vs 5 generated fields). The ensemble has a fixed architectural sample count of 5; the matched comparison isolates calibration quality from sample-size effects in mean/std estimation. A K=20 generative compute-advantage comparison is retained in Appendix Table A1 of [benchmark_results.md](docs/benchmark_results.md) for reference.
 
 **The held-out BC family test is one specific OOD stress test.** Piecewise constant BCs are excluded from training entirely. A lower OOD/in-dist ratio suggests stronger generalization but does not prove a model has learned the PDE in any deep sense.
 

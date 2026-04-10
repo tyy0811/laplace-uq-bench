@@ -40,16 +40,16 @@ Searched zeta_obs in {0.1, 0.5, 1.0, 5.0, 10.0} x zeta_pde in {0.0, 0.01, 0.1, 1
 
 | zeta_obs | zeta_pde | Rel L2 | Obs RMSE | PDE Residual |
 |----------|----------|--------|----------|--------------|
-| 0.1 | 0.0 | 1.14 | 0.73 | 4.15 |
-| 0.5 | 0.0 | 1.13 | 0.73 | 4.16 |
-| 1.0 | 0.0 | 0.93 | 0.63 | 4.16 |
-| 5.0 | 0.0 | 0.54 | 0.39 | 4.15 |
-| 10.0 | 0.0 | 0.30 | 0.24 | 4.19 |
-| 10.0 | 0.01 | 1.02 | 0.65 | 16.1 |
-| 10.0 | 0.1 | 1.09 | 0.70 | 55.9 |
-| 10.0 | 1.0 | 1.12 | 0.72 | 40.2 |
+| 0.1 | 0.0 | 1.140 | 0.73 | 4.15 |
+| 0.5 | 0.0 | 1.130 | 0.73 | 4.16 |
+| 1.0 | 0.0 | 0.930 | 0.63 | 4.16 |
+| 5.0 | 0.0 | 0.540 | 0.39 | 4.15 |
+| 10.0 | 0.0 | 0.304 | 0.24 | 4.19 |
+| 10.0 | 0.01 | 1.020 | 0.65 | 16.1 |
+| 10.0 | 0.1 | 1.090 | 0.70 | 55.9 |
+| 10.0 | 1.0 | 1.120 | 0.72 | 40.2 |
 
-Finding: zeta_pde=0 consistently best at every zeta_obs level. Any nonzero physics weight degraded performance. Stronger measurement guidance monotonically improved accuracy with no plateau at zeta_obs=10.
+Finding: zeta_pde=0 consistently best at every zeta_obs level. Any nonzero physics weight degraded performance. Stronger measurement guidance monotonically improved accuracy with no plateau at zeta_obs=10. This monotonic improvement motivated the Round 2 extended grid up to zeta_obs=100; Round 1 alone would have led to under-tuning.
 
 ### Round 2: Extended grid (higher zeta_obs + relaxed clipping)
 
@@ -98,7 +98,7 @@ zeta_obs=100, zeta_pde=0, grad_clip=None, 20 validation examples (sparse-noisy).
 | Min | 0.026 |
 | Max | 0.135 |
 
-Distribution is tight and unimodal with slight right skew. No outliers above 0.15. Worst-case example (0.135) is still a meaningful reconstruction.
+Distribution is tight and unimodal with slight right skew. No outliers above 0.15. Worst-case example (0.135) is still a meaningful reconstruction. (This pre-flight distribution is on 20 validation examples; the full §10.5 evaluation in benchmark_results.md Table 7 reports median rel L2 = 0.056 on the full test set.)
 
 ### Pre-flight: Observation noise floor analysis
 
@@ -131,6 +131,8 @@ The guidance schedule scales linearly from 10% at t=1 to 100% at t=T. Stronger g
 ### Why reuse conditional DDPM backbone with in_channels=1
 
 The unconditional model uses the same ConditionalUNet architecture with in_ch=1 instead of 9. This ensures capacity is identical — any performance difference between conditional and unconditional is due to the conditioning signal, not architecture. The ~4.5M parameter count is sufficient for 64x64 Laplace solutions.
+
+Note that since the BCs fully determine T via the FD solver, training on exact BCs gives the prior the marginal p(T) induced by the BC generation distribution (§2.4) — not a "free" prior over arbitrary harmonic functions. This is appropriate for the benchmark but means the prior's coverage of solution fields inherits the structure of the BC family.
 
 ### Why train unconditional prior on exact BCs only
 
