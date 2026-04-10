@@ -2,6 +2,10 @@
 
 Comparison of pixel-level UQ metrics at matched sample count (K=5) vs the previous K=20 generative evaluation. All numbers from pixelwise conformal prediction at 90% target on 300 test samples (150 cal / 150 test). Ensemble uses 5 fixed members throughout.
 
+**Why matched K=5.** Earlier evaluations of generative methods (FM, DDPM) used K=20 samples for mean/standard-deviation estimation while the ensemble baseline used its 5 fixed members. This gave generative methods a statistical advantage in the pixel-level coverage and interval-width metrics. The tables below report the corrected matched-sample comparison at K=5 across all methods; K=20 generative results are retained for reference. Functional CRPS (§11.3) was already reported at matched K=5 in earlier revisions and is unchanged.
+
+Coverage values within ~2.5pp of the 90% target are within finite-sample noise (binomial SE on 150 test samples). Variation between 87.8% and 91.2% across regimes should not be over-interpreted.
+
 ## In-Distribution (test_in.npz)
 
 ### Exact BCs (64 pts, no noise)
@@ -66,4 +70,4 @@ At matched K=5, raw coverage for generative models drops by 5-12 percentage poin
 | sparse-noisy | 0.133 | **0.115** | 0.156 | DDPM |
 | very-sparse | 0.380 | **0.311** | 0.420 | DDPM |
 
-DDPM produces the tightest calibrated intervals at every regime, even at matched sample count. The advantage over ensemble narrows from 2.5-10x (K=20) to 1.2-6.6x (K=5) but remains consistent.
+DDPM produces the tightest calibrated intervals at every regime, even at matched sample count. The advantage over ensemble narrows from 1.5–10.7x (K=20) to 1.2–6.8x (K=5) — the headline regimes (sparse-noisy, very-sparse) were always modest and are now slightly more so; the exact and sparse-clean regimes retain a large multiplier because the true posterior is nearly degenerate there and DDPM correctly recognizes this.
