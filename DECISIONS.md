@@ -132,6 +132,14 @@ The guidance schedule scales linearly from 10% at t=1 to 100% at t=T. Stronger g
 
 The unconditional model uses the same ConditionalUNet architecture with in_ch=1 instead of 9. This ensures capacity is identical — any performance difference between conditional and unconditional is due to the conditioning signal, not architecture. The ~4.5M parameter count is sufficient for 64x64 Laplace solutions.
 
+### Why train unconditional prior on exact BCs only
+
+The unconditional model trains on clean Laplace solutions (regime: exact in the config). It never sees noisy or sparse boundary conditions during training — unlike the conditional models which train on mixed regimes (§5.4). This is intentional: the unconditional prior should learn p(T), the distribution over solution fields, not p(T|observations). Observation information enters only at inference via the guidance gradient. Training on mixed-regime data would conflate the prior with the observation model, defeating the purpose of the unconditional approach.
+
+### Why mean-normalized guidance losses
+
+The measurement loss uses `.mean()` over spatial dimensions: `(y_obs - y_pred).pow(2).mean()`. This makes the guidance strength (zeta_obs=100) invariant to the number of observation points. If we used `.sum()`, doubling the observation count would double the effective guidance, requiring re-tuning zeta_obs for each regime. Mean normalization decouples the guidance strength from observation density, which is why a single zeta_obs works across all 5 regimes.
+
 ### What we would change at larger scale
 
 1. Search zeta_obs > 100 to check for further improvement or eventual instability
